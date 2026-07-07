@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, type AdminBotDocumentInfo } from '../lib/api';
+import { shouldHideQiyaKnowledgeDocuments } from '../lib/qiya-knowledge-visibility';
 import styles from './AdminBotPanel.module.css';
 import {
     X, Save, Upload, Loader2, FileText, File, Image,
@@ -100,6 +101,7 @@ export default function AdminBotPanel({ botId, botKind, isOpen, onClose }: Admin
     const [assistantCopied, setAssistantCopied] = useState(false);
     const assistantOutputRef = useRef<HTMLDivElement>(null);
     const assistantAbortRef = useRef<AbortController | null>(null);
+    const shouldShowKnowledgeDocuments = !shouldHideQiyaKnowledgeDocuments(botId, botKind);
 
     const loadBotData = useCallback(async () => {
         try {
@@ -109,7 +111,7 @@ export default function AdminBotPanel({ botId, botKind, isOpen, onClose }: Admin
             const prompt = res.data.systemPrompt || '';
             setSystemPrompt(prompt);
             setOriginalPrompt(prompt);
-            setDocuments(res.data.documents || []);
+            setDocuments(shouldShowKnowledgeDocuments ? (res.data.documents || []) : []);
             const parsed = parsePromptSections(prompt);
             setSections(parsed);
             if (parsed.length > 0) {
@@ -120,7 +122,7 @@ export default function AdminBotPanel({ botId, botKind, isOpen, onClose }: Admin
         } finally {
             setIsLoading(false);
         }
-    }, [botId, botKind]);
+    }, [botId, botKind, shouldShowKnowledgeDocuments]);
 
     useEffect(() => {
         if (isOpen) {
@@ -569,7 +571,7 @@ export default function AdminBotPanel({ botId, botKind, isOpen, onClose }: Admin
                         </div>
 
                         {/* Knowledge Documents */}
-                        <div className={styles.section}>
+                        {shouldShowKnowledgeDocuments ? <div className={styles.section}>
                             <div className={styles.sectionHeader}>
                                 <h3>知识库文档</h3>
                                 <span className={styles.docCount}>{documents.length} 个</span>
@@ -624,7 +626,7 @@ export default function AdminBotPanel({ botId, botKind, isOpen, onClose }: Admin
                                 onChange={handleDocUpload}
                             />
                             <p className={styles.uploadHint}>支持 PDF、Word、TXT、Markdown、CSV 和图片</p>
-                        </div>
+                        </div> : null}
                     </div>
                 )}
                 {/* Prompt Assistant Modal */}

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
 import { AppError, errorResponse, getAuthUser } from '../../../../../lib/auth';
+import { isQiyaEnterpriseManagementRouteId } from '../../../../../lib/qiya-knowledge-visibility';
 
 async function resolvePresetBot(idOrRouteId: string) {
     let bot = await prisma.bot.findUnique({ where: { id: idOrRouteId } });
@@ -34,6 +35,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         } else {
             const bot = await resolvePresetBot(id);
             if (!bot) throw new AppError('智能体不存在', 404);
+            if (isQiyaEnterpriseManagementRouteId(String(bot.sortOrder))) {
+                return Response.json({ success: true, data: [] });
+            }
 
             documents = await prisma.presetBotDocument.findMany({
                 where: { botId: bot.id },
@@ -76,6 +80,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         const bot = await resolvePresetBot(id);
         if (!bot) throw new AppError('智能体不存在', 404);
+        if (isQiyaEnterpriseManagementRouteId(String(bot.sortOrder))) {
+            throw new AppError('文档不存在', 404);
+        }
 
         const doc = await prisma.presetBotDocument.create({
             data: {

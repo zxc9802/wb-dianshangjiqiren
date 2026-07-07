@@ -1,8 +1,7 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
 import { AppError, errorResponse, getAuthUser } from '../../../../lib/auth';
-import knowledgeIndex from '../../../../lib/builtin-knowledge/qiya-enterprise-management.json';
-import { QIYA_ENTERPRISE_MANAGEMENT_BOT_ID } from '../../../../lib/builtin-bots';
+import { isQiyaEnterpriseManagementRouteId } from '../../../../lib/qiya-knowledge-visibility';
 
 async function findPresetBot(idOrRouteId: string) {
     // Try UUID lookup first
@@ -17,20 +16,6 @@ async function findPresetBot(idOrRouteId: string) {
         bot = await prisma.bot.findFirst({ where: { sortOrder } });
     }
     return bot;
-}
-
-function getBuiltinKnowledgeDocs(routeId: string) {
-    if (routeId !== QIYA_ENTERPRISE_MANAGEMENT_BOT_ID) return [];
-    const index = knowledgeIndex as { sources: Array<{ id: string; title: string; charCount: number; chunkCount: number }> };
-    return index.sources.map((src) => ({
-        id: `builtin-${src.id}`,
-        fileName: src.title,
-        fileType: 'json',
-        fileSize: src.charCount,
-        createdAt: new Date().toISOString(),
-        isBuiltin: true,
-        chunkCount: src.chunkCount,
-    }));
 }
 
 async function getPresetBotUploadedDocs(botId: string) {
@@ -78,9 +63,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const bot = await findPresetBot(id);
         if (!bot) throw new AppError('智能体不存在', 404);
 
-        const builtinKnowledgeDocs = getBuiltinKnowledgeDocs(String(bot.sortOrder));
-        const uploadedDocs = await getPresetBotUploadedDocs(bot.id);
-        const documents = [...uploadedDocs, ...builtinKnowledgeDocs];
+        const documents = isQiyaEnterpriseManagementRouteId(String(bot.sortOrder))
+            ? []
+            : await getPresetBotUploadedDocs(bot.id);
 
         return Response.json({
             success: true,
