@@ -3,9 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Settings, ShieldCheck } from 'lucide-react';
-import SearchableSelect from '../components/SearchableSelect';
-import { api, ApiError } from '../lib/api';
-import { FIXED_MEMBER_NAMES } from '../lib/member-directory';
+import { api } from '../lib/api';
 import { useAuthStore } from '../stores/auth';
 import styles from './profile.module.css';
 
@@ -42,11 +40,7 @@ export default function ProfilePage() {
             setIsEditing(false);
             setFeedback({ type: 'success', message: '姓名已保存。' });
         } catch (error) {
-            if (error instanceof ApiError && error.code === 'PROFILE_NAME_INVALID') {
-                setFeedback({ type: 'error', message: '姓名不在固定名单中，请重新搜索并选择。' });
-            } else {
-                setFeedback({ type: 'error', message: error instanceof Error ? error.message : '姓名保存失败。' });
-            }
+            setFeedback({ type: 'error', message: error instanceof Error ? error.message : '姓名保存失败。' });
         } finally {
             setIsSaving(false);
         }
@@ -105,21 +99,17 @@ export default function ProfilePage() {
                         <span className={styles.settingLabel}>姓名</span>
                         {isEditing ? (
                             <div className={styles.editRow}>
-                                <div className={styles.editSelect}>
-                                    <SearchableSelect
-                                        label="姓名"
-                                        options={FIXED_MEMBER_NAMES}
-                                        value={nickname}
-                                        onChange={(nextValue) => {
-                                            setNickname(nextValue);
-                                            setFeedback(null);
-                                        }}
-                                        placeholder="输入姓名关键词后选择"
-                                        helperText="姓名只能从固定 29 人名单中搜索选择。"
-                                        noResultsText="未搜索到名单内姓名，不能自定义输入。"
-                                        disabled={isSaving}
-                                    />
-                                </div>
+                                <input
+                                    type="text"
+                                    value={nickname}
+                                    onChange={(event) => {
+                                        setNickname(event.target.value);
+                                        setFeedback(null);
+                                    }}
+                                    placeholder="请输入姓名"
+                                    className={styles.editInput}
+                                    disabled={isSaving}
+                                />
                                 <button className={styles.saveBtn} onClick={() => void handleSaveNickname()} disabled={isSaving || !nickname.trim()}>
                                     {isSaving ? '保存中...' : '保存'}
                                 </button>

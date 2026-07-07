@@ -2,7 +2,6 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { AppError, getAuthUser, errorResponse } from '../../../lib/auth';
-import { isAllowedMemberName } from '../../../lib/member-directory';
 
 const updateProfileSchema = z.object({
     nickname: z.string().trim().min(1, 'Nickname is required.').max(20, 'Nickname is too long.'),
@@ -45,10 +44,6 @@ export async function PATCH(req: NextRequest) {
         const user = await getAuthUser(req);
         const data = updateProfileSchema.parse(await req.json());
         const nextNickname = data.nickname.trim();
-
-        if (user.role !== 'admin' && !isAllowedMemberName(nextNickname)) {
-            throw new AppError('Please select a valid name from the list.', 400, 'PROFILE_NAME_INVALID');
-        }
 
         const updated = await prisma.user.update({
             where: { id: user.id },

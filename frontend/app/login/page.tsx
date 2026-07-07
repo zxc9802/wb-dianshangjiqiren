@@ -3,38 +3,23 @@
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Bot } from 'lucide-react';
-import SearchableSelect from '../components/SearchableSelect';
 import { ApiError } from '../lib/api';
-import {
-    FIXED_GROUP_NAMES,
-    FIXED_MEMBER_NAMES,
-    isAllowedGroupName,
-    isAllowedMemberName,
-} from '../lib/member-directory';
 import { useAuthStore } from '../stores/auth';
 import styles from './login.module.css';
 
 type AuthMode = 'login' | 'register';
 
-function getRegisterSelectionError(nickname: string, groupName: string): string {
+function getRegisterProfileError(nickname: string, groupName: string): string {
     if (!nickname && !groupName) {
-        return '请选择名单中的姓名和组别。';
+        return '请填写姓名和组别。';
     }
 
     if (!nickname) {
-        return '请选择名单中的姓名。';
+        return '请填写姓名。';
     }
 
     if (!groupName) {
-        return '请选择名单中的组别。';
-    }
-
-    if (!isAllowedMemberName(nickname)) {
-        return '姓名不在固定名单中，请重新搜索并选择。';
-    }
-
-    if (!isAllowedGroupName(groupName)) {
-        return '组别不在固定名单中，请重新搜索并选择。';
+        return '请填写组别。';
     }
 
     return '';
@@ -66,9 +51,9 @@ function LoginPageContent() {
         setError('');
 
         if (isRegister) {
-            const selectionError = getRegisterSelectionError(nickname, groupName);
-            if (selectionError) {
-                setError(selectionError);
+            const profileError = getRegisterProfileError(nickname, groupName);
+            if (profileError) {
+                setError(profileError);
                 return;
             }
         }
@@ -95,16 +80,10 @@ function LoginPageContent() {
                     setError('邀请码无效或已被使用。');
                 } else if (err.code === 'PROFILE_NAME_REQUIRED') {
                     setMode('register');
-                    setError('注册时必须选择姓名。');
+                    setError('注册时必须填写姓名。');
                 } else if (err.code === 'PROFILE_GROUP_REQUIRED') {
                     setMode('register');
-                    setError('注册时必须选择组别。');
-                } else if (err.code === 'PROFILE_NAME_INVALID') {
-                    setMode('register');
-                    setError('姓名不在固定名单中，请重新搜索并选择。');
-                } else if (err.code === 'PROFILE_GROUP_INVALID') {
-                    setMode('register');
-                    setError('组别不在固定名单中，请重新搜索并选择。');
+                    setError('注册时必须填写组别。');
                 } else {
                     setError(err.message);
                 }
@@ -168,33 +147,35 @@ function LoginPageContent() {
 
                         {isRegister ? (
                             <>
-                                <SearchableSelect
-                                    label="姓名"
-                                    options={FIXED_MEMBER_NAMES}
-                                    value={nickname}
-                                    onChange={(nextValue) => {
-                                        setNickname(nextValue);
-                                        if (error) setError('');
-                                    }}
-                                    placeholder="输入姓名关键词后选择，例如：张"
-                                    required
-                                    helperText="姓名固定为 29 人名单，只能搜索并选择。"
-                                    noResultsText="未搜索到名单内姓名，不能自定义输入。"
-                                />
+                                <div className={styles.field}>
+                                    <label className={styles.label}>姓名</label>
+                                    <input
+                                        type="text"
+                                        value={nickname}
+                                        onChange={(event) => {
+                                            setNickname(event.target.value);
+                                            if (error) setError('');
+                                        }}
+                                        placeholder="请输入姓名"
+                                        required
+                                        className={styles.input}
+                                    />
+                                </div>
 
-                                <SearchableSelect
-                                    label="组别"
-                                    options={FIXED_GROUP_NAMES}
-                                    value={groupName}
-                                    onChange={(nextValue) => {
-                                        setGroupName(nextValue);
-                                        if (error) setError('');
-                                    }}
-                                    placeholder="输入组别关键词后选择，例如：技术"
-                                    required
-                                    helperText="组别固定为指定名单，其他项排在最后。"
-                                    noResultsText="未搜索到可选组别，不能自定义输入。"
-                                />
+                                <div className={styles.field}>
+                                    <label className={styles.label}>组别</label>
+                                    <input
+                                        type="text"
+                                        value={groupName}
+                                        onChange={(event) => {
+                                            setGroupName(event.target.value);
+                                            if (error) setError('');
+                                        }}
+                                        placeholder="请输入组别"
+                                        required
+                                        className={styles.input}
+                                    />
+                                </div>
                             </>
                         ) : null}
 
@@ -232,7 +213,7 @@ function LoginPageContent() {
 
                         {isRegister ? (
                             <p className={styles.switchHint}>
-                                邀请码为一次性凭证。注册时请填写邀请码，并从固定名单中搜索选择姓名与组别。
+                                邀请码为一次性凭证。注册时请填写邀请码、姓名与组别。
                             </p>
                         ) : null}
 

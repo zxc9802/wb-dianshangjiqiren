@@ -25,10 +25,26 @@ test('fixed member directory includes Ran Jianglong', async () => {
   assert.ok(names.includes('冉江龙'))
 })
 
-test('member count hints match the fixed directory size', async () => {
+test('profile pages no longer tell users to choose from a fixed directory', async () => {
   const loginPage = await readFile(loginPagePath, 'utf8')
   const profilePage = await readFile(profilePagePath, 'utf8')
 
-  assert.match(loginPage, /姓名固定为 29 人名单/)
-  assert.match(profilePage, /姓名只能从固定 29 人名单中搜索选择/)
+  assert.doesNotMatch(loginPage, /姓名固定为 29 人名单/)
+  assert.doesNotMatch(profilePage, /姓名只能从固定 29 人名单中搜索选择/)
+})
+
+test('registration profile fields accept typed values instead of fixed-list selections', async () => {
+  const loginPage = await readFile(loginPagePath, 'utf8')
+  const profilePage = await readFile(profilePagePath, 'utf8')
+  const authRoute = await readFile(path.join(appRoot, 'api', 'auth', 'route.ts'), 'utf8')
+  const authMeRoute = await readFile(path.join(appRoot, 'api', 'auth', 'me', 'route.ts'), 'utf8')
+
+  assert.doesNotMatch(loginPage, /SearchableSelect/)
+  assert.doesNotMatch(profilePage, /SearchableSelect/)
+  assert.doesNotMatch(loginPage, /FIXED_(MEMBER|GROUP)_NAMES/)
+  assert.doesNotMatch(profilePage, /FIXED_(MEMBER|GROUP)_NAMES/)
+  assert.doesNotMatch(loginPage, /固定名单|搜索并选择|不能自定义输入/)
+  assert.doesNotMatch(authRoute, /assertAllowed(Nickname|GroupName)/)
+  assert.doesNotMatch(authRoute, /isAllowed(MemberName|GroupName)/)
+  assert.doesNotMatch(authMeRoute, /isAllowedMemberName/)
 })
