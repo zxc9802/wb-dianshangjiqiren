@@ -26,7 +26,6 @@ import {
 } from './lib/chat-models';
 import { putLaunchChatDraft } from './lib/launch-chat-drafts';
 import { VIDEO_SITE_METADATA, type VideoSiteKey } from './lib/video-sites';
-import { XHS_SITE_METADATA } from './lib/xhs-site';
 import { startPcm16kMonoRecorder, type Pcm16Recorder } from './lib/pcmRecorder';
 import { api } from './lib/api';
 import styles from './page.module.css';
@@ -155,19 +154,6 @@ const COPYWRITING_AGENT_TOOL: BotInfo = {
   icon: <PenTool size={22} />,
   iconColor: '#dc2626',
   path: '/bot/copywriting-agent?autostart=1&openMode=replace',
-  pointsPerUse: 0,
-  isTrial: false,
-  requiresAuth: true,
-};
-
-const XHS_AUTO_PUBLISH_TOOL: BotInfo = {
-  id: 'xhs-auto-publish',
-  name: '小红书自动发布',
-  category: '管理工具',
-  description: '登录后直达小红书自动发布控制台，使用主站账号同步权限并完成发布操作。',
-  icon: <Smartphone size={22} />,
-  iconColor: '#dc0033',
-  path: `${XHS_SITE_METADATA.entryPath}?autostart=1&openMode=replace`,
   pointsPerUse: 0,
   isTrial: false,
   requiresAuth: true,
@@ -309,7 +295,6 @@ const HOMEPAGE_BOTS: BotInfo[] = BUILTIN_BOTS
 
 const ALL_HOMEPAGE_BOTS: BotInfo[] = [
   KB_CHAT_TOOL,
-  XHS_AUTO_PUBLISH_TOOL,
   COPYWRITING_AGENT_TOOL,
   ...HOMEPAGE_BOTS,
   BUYER_SHOW_TOOL,
