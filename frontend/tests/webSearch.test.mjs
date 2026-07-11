@@ -53,9 +53,9 @@ async function loadTsModule(relativePath, options = {}) {
   return cjsModule.exports
 }
 
-test('web search mode off skips AnySearch and leaves prompt unchanged', async () => {
+test('web search mode off skips Yunwu search and leaves prompt unchanged', async () => {
   const { enrichSystemPromptWithWebSearch } = await loadTsModule(['lib', 'web-search.ts'], {
-    env: { ANYSEARCH_API_KEY: 'test-key' },
+    env: { YUNWU_SEARCH_API_KEY: 'test-key' },
     fetch: async () => {
       throw new Error('fetch should not be called')
     },
@@ -71,22 +71,19 @@ test('web search mode off skips AnySearch and leaves prompt unchanged', async ()
   assert.equal(result.usedWebSearch, false)
 })
 
-test('web search mode on calls AnySearch and appends search context', async () => {
+test('web search mode on calls Yunwu and appends search context', async () => {
   const calls = []
   const { enrichSystemPromptWithWebSearch } = await loadTsModule(['lib', 'web-search.ts'], {
-    env: { ANYSEARCH_API_KEY: 'test-key' },
+    env: { YUNWU_SEARCH_API_KEY: 'test-key' },
     fetch: async (url, init) => {
-      calls.push({ url, body: JSON.parse(init.body) })
+      calls.push({ url, headers: init.headers, body: JSON.parse(init.body) })
       return new Response(JSON.stringify({
-        code: 0,
-        message: 'success',
-        data: {
-          results: [{
-            title: 'Result A',
-            url: 'https://example.com/a',
-            content: 'Fresh search content',
-          }],
-        },
+        choices: [{
+          message: {
+            role: 'assistant',
+            content: 'A positive current news story with source references.',
+          },
+        }],
       }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     },
   })
@@ -98,23 +95,67 @@ test('web search mode on calls AnySearch and appends search context', async () =
   })
 
   assert.equal(calls.length, 1)
-  assert.equal(calls[0].url, 'https://api.anysearch.com/v1/search')
-  assert.equal(calls[0].body.query, 'What is quantum computing?')
-  assert.equal(calls[0].body.max_results, 5)
+  assert.equal(calls[0].url, 'https://yunwu.ai/v1/chat/completions')
+  assert.equal(calls[0].headers.Authorization, 'Bearer test-key')
+  assert.deepEqual(calls[0].body, {
+    model: 'gpt-4o-search-preview',
+    web_search_options: {},
+    messages: [{ role: 'user', content: 'What is quantum computing?' }],
+  })
   assert.equal(result.usedWebSearch, true)
   assert.match(result.systemPrompt, /# 联网搜索参考/)
-  assert.match(result.systemPrompt, /Result A/)
-  assert.match(result.systemPrompt, /https:\/\/example\.com\/a/)
-  assert.match(result.systemPrompt, /Fresh search content/)
+  assert.match(result.systemPrompt, /A positive current news story with source references\./)
+})
+
+test('web search uses the configured Yunwu API URL', async () => {
+  const calls = []
+  const { enrichSystemPromptWithWebSearch } = await loadTsModule(['lib', 'web-search.ts'], {
+    env: {
+      YUNWU_SEARCH_API_KEY: 'test-key',
+      YUNWU_SEARCH_API_URL: 'https://search.example.com/v1/chat/completions',
+    },
+    fetch: async (url) => {
+      calls.push(url)
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: 'Search result' } }],
+      }), { status: 200 })
+    },
+  })
+
+  await enrichSystemPromptWithWebSearch({
+    systemPrompt: 'base prompt',
+    messages: [{ role: 'user', content: 'latest news' }],
+    webSearchMode: 'on',
+  })
+
+  assert.deepEqual(calls, ['https://search.example.com/v1/chat/completions'])
+})
+
+test('web search rejects a Yunwu response without usable content', async () => {
+  const { enrichSystemPromptWithWebSearch } = await loadTsModule(['lib', 'web-search.ts'], {
+    env: { YUNWU_SEARCH_API_KEY: 'test-key' },
+    fetch: async () => new Response(JSON.stringify({ choices: [{ message: {} }] }), { status: 200 }),
+  })
+
+  await assert.rejects(
+    enrichSystemPromptWithWebSearch({
+      systemPrompt: 'base prompt',
+      messages: [{ role: 'user', content: 'latest news' }],
+      webSearchMode: 'on',
+    }),
+    /Yunwu web search returned no usable content\./,
+  )
 })
 
 test('web search mode auto only searches for freshness-sensitive queries', async () => {
   let callCount = 0
   const { enrichSystemPromptWithWebSearch } = await loadTsModule(['lib', 'web-search.ts'], {
-    env: { ANYSEARCH_API_KEY: 'test-key' },
+    env: { YUNWU_SEARCH_API_KEY: 'test-key' },
     fetch: async () => {
       callCount += 1
-      return new Response(JSON.stringify({ code: 0, data: { results: [] } }), { status: 200 })
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: 'Fresh result' } }],
+      }), { status: 200 })
     },
   })
 
