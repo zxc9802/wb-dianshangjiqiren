@@ -36,6 +36,18 @@ JWT_SECRET=change-me
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/ecommerce_ai
 ```
 
+## Local chunked video uploads
+
+Videos at or below 20MiB continue to use the normal upload endpoint. Larger videos use 5MiB retryable chunks, are merged on the local disk, and are processed asynchronously through a polled job. Configure the optional limits with:
+
+```dotenv
+VIDEO_UPLOAD_MAX_BYTES=524288000
+VIDEO_UPLOAD_CHUNK_BYTES=5242880
+VIDEO_UPLOAD_JOB_TTL_MS=7200000
+```
+
+Video bytes are never stored in PostgreSQL. The database temporarily stores job and chunk-receipt metadata; chunk rows and disk parts are deleted immediately after merge, and terminal job metadata expires after two hours. This mode is intended for one Zeabur instance. A restart during upload or processing makes the active job fail and requires the user to upload again. Existing `VIDEO_COMPRESS_TARGET_SIZE` and FFmpeg settings still control final compression.
+
 Expected flow:
 
 1. User logs into the main site.
