@@ -144,7 +144,7 @@ export async function uploadVideoInChunks(options: {
         }, '无法查询视频处理进度。');
         options.onProgress?.(job);
         if (job.status === 'succeeded') {
-            if (!job.result?.tempVideoToken) {
+            if (!(job.result?.tempVideoToken || job.result?.extractedText?.trim())) {
                 throw new Error('视频处理结果不完整，请重新上传。');
             }
             return job.result;

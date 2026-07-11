@@ -616,7 +616,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         tempVideoTokensToCleanup = attachments
             .filter((attachment) => attachment.kind === 'video' && attachment.tempVideoToken)
             .map((attachment) => attachment.tempVideoToken as string);
-        const unresolvedGeminiVideos = attachments.filter((attachment) => attachment.kind === 'video' && !attachment.inlineVideoData && !attachment.tempVideoToken).length;
+        const unresolvedGeminiVideos = attachments.filter((attachment) => attachment.kind === 'video'
+            && !attachment.inlineVideoData
+            && !attachment.tempVideoToken
+            && !attachment.extractedText.trim()).length;
         if (responseModel === 'gemini' && unresolvedGeminiVideos > 0) {
             throw new AppError('Gemini 未收到当前视频文件，请重新上传后重试。', 400);
         }

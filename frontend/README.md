@@ -48,6 +48,18 @@ VIDEO_UPLOAD_JOB_TTL_MS=7200000
 
 Video bytes are never stored in PostgreSQL. The database temporarily stores job and chunk-receipt metadata; chunk rows and disk parts are deleted immediately after merge, and terminal job metadata expires after two hours. This mode is intended for one Zeabur instance. A restart during upload or processing makes the active job fail and requires the user to upload again. Existing `VIDEO_COMPRESS_TARGET_SIZE` and FFmpeg settings still control final compression.
 
+For Gemini, the worker first compresses the full video. If the actual compressed file is at most 18MiB, Gemini analyzes it directly. Otherwise, FFmpeg splits it into independently playable segments targeting 15MiB and no more than 90 seconds each. Gemini analyzes at most two segments concurrently, retries a failed segment twice, then synthesizes the ordered segment results into one answer using the user's original question. Temporary full-video and segment files are deleted after analysis.
+
+The Gemini thresholds can be adjusted when needed:
+
+```dotenv
+GEMINI_VIDEO_MAX_BYTES=18874368
+GEMINI_VIDEO_SEGMENT_TARGET_BYTES=15728640
+GEMINI_VIDEO_SEGMENT_MAX_SECONDS=90
+```
+
+Segmented analysis makes multiple Gemini requests (one per segment plus one final synthesis request), so a longer video takes more time and consumes more API quota than direct analysis.
+
 Expected flow:
 
 1. User logs into the main site.

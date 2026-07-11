@@ -238,3 +238,12 @@ test('large video jobs preserve the current user analysis question', async () =>
   assert.match(chat, /analysisPrompt: rawText/)
   assert.match(createRoute, /analysisPrompt/)
 })
+
+test('Gemini accepts a segmented video result with analysis text and no full-video token', async () => {
+  const [clientSource, messageRouteSource] = await Promise.all([
+    readFile(path.join(frontendRoot, 'app', 'lib', 'chunked-video-upload.ts'), 'utf8'),
+    readFile(path.join(frontendRoot, 'app', 'api', 'conversations', '[id]', 'messages', 'route.ts'), 'utf8'),
+  ])
+  assert.match(clientSource, /job\.result\?\.tempVideoToken\s*\|\|\s*job\.result\?\.extractedText/)
+  assert.match(messageRouteSource, /attachment\.extractedText\.trim\(\)/)
+})
