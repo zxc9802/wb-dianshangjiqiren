@@ -608,3 +608,294 @@ git commit -m "docs: describe local chunked video uploads"
 - [ ] **Step 7: Present integration choices**
 
 Report the focused-test count, full-suite result including any unchanged baseline failure, build result, commit list, required database schema sync, and the three optional environment variables. Do not push or deploy without explicit authorization.
+
+### Task 8: Carry the user's analysis question into the background job
+
+**Files:**
+- Modify: `frontend/prisma/schema.prisma`
+- Modify: `frontend/app/lib/video-upload-types.ts`
+- Modify: `frontend/app/lib/chunked-video-upload.ts`
+- Modify: `frontend/app/chat/[id]/page.tsx`
+- Modify: `frontend/tests/videoChunkUpload.test.mjs`
+
+- [ ] **Step 1: Write a failing prompt propagation test**
+
+Assert the schema contains `analysisPrompt`, the create input accepts it, the browser request serializes it, and chat passes `rawText`:
+
+```js
+test('large video jobs preserve the current user analysis question', async () => {
+  const [schema, types, client, chat] = await Promise.all([
+    readFile(path.join(frontendRoot, 'prisma', 'schema.prisma'), 'utf8'),
+    readFile(path.join(frontendRoot, 'app', 'lib', 'video-upload-types.ts'), 'utf8'),
+    readFile(path.join(frontendRoot, 'app', 'lib', 'chunked-video-upload.ts'), 'utf8'),
+    readFile(path.join(frontendRoot, 'app', 'chat', '[id]', 'page.tsx'), 'utf8'),
+  ])
+  assert.match(schema, /analysisPrompt\s+String\s+@default\(""\)/)
+  assert.match(types, /analysisPrompt: string/)
+  assert.match(client, /analysisPrompt: options\.analysisPrompt/)
+  assert.match(chat, /analysisPrompt: rawText/)
+})
+```
+
+- [ ] **Step 2: Verify RED**
+
+Run `cd frontend && node --test tests/videoChunkUpload.test.mjs`.
+
+Expected: FAIL because the prompt is not yet propagated.
+
+- [ ] **Step 3: Implement prompt persistence**
+
+Add `analysisPrompt String @default("") @map("analysis_prompt") @db.Text` to `VideoUploadJob`. Add `analysisPrompt: string` to `CreateVideoUploadInput` and the browser uploader options. Limit the route value to 4000 characters and persist `input.analysisPrompt.trim().slice(0, 4000)`. Pass `rawText` from the chat send path.
+
+- [ ] **Step 4: Generate Prisma and verify GREEN**
+
+```bash
+cd frontend && npx prisma generate && node --test tests/videoChunkUpload.test.mjs
+```
+
+Expected: generation and prompt propagation tests pass.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add frontend/prisma/schema.prisma frontend/app/lib/video-upload-types.ts frontend/app/lib/chunked-video-upload.ts frontend/app/chat/[id]/page.tsx frontend/tests/videoChunkUpload.test.mjs
+git commit -m "feat: preserve video analysis questions"
+```
+
+### Task 9: Enforce the Gemini size limit and create playable time segments
+
+**Files:**
+- Modify: `frontend/app/lib/server-chat-video.ts`
+- Create: `frontend/app/lib/server-gemini-video-analysis.ts`
+- Create: `frontend/tests/geminiSegmentedVideo.test.mjs`
+
+- [ ] **Step 1: Write failing segment-planning tests**
+
+Test pure planning before FFmpeg integration:
+
+```js
+test('segment planning targets 15MiB and never exceeds 90 seconds', async () => {
+  const { planGeminiVideoSegments } = await loadGeminiVideoModule()
+  const plan = planGeminiVideoSegments({
+    fileSize: 184 * 1024 * 1024,
+    durationMs: 10 * 60_000,
+    targetBytes: 15 * 1024 * 1024,
+    maxSegmentSeconds: 90,
+  })
+  assert.equal(plan.segmentSeconds, 48)
+  assert.equal(plan.totalSegments, 13)
+})
+
+test('a file at the 18MiB limit stays on the direct Gemini path', async () => {
+  const { shouldSegmentGeminiVideo } = await loadGeminiVideoModule()
+  assert.equal(shouldSegmentGeminiVideo(18 * 1024 * 1024, 18 * 1024 * 1024), false)
+  assert.equal(shouldSegmentGeminiVideo((18 * 1024 * 1024) + 1, 18 * 1024 * 1024), true)
+})
+```
+
+- [ ] **Step 2: Verify RED**
+
+Run `cd frontend && node --test tests/geminiSegmentedVideo.test.mjs`.
+
+Expected: FAIL because the module does not exist.
+
+- [ ] **Step 3: Add path inspection and FFmpeg splitting helpers**
+
+Export from `server-chat-video.ts`:
+
+```ts
+export async function getTempVideoFileInfo(token: string): Promise<{
+    absolutePath: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+    durationMs?: number;
+}>;
+
+export async function splitVideoFileByTime(params: {
+    absolutePath: string;
+    outputDirectory: string;
+    segmentSeconds: number;
+}): Promise<Array<{ absolutePath: string; durationMs: number }>>;
+```
+
+Use FFmpeg segment output `segment-%03d.mp4`, reset timestamps, and force playable MP4 output. Probe every output file and return actual durations. Do not load the full file into a Buffer.
+
+- [ ] **Step 4: Implement pure size planning and hard checks**
+
+Create `server-gemini-video-analysis.ts` with:
+
+```ts
+export const DEFAULT_GEMINI_VIDEO_MAX_BYTES = 18 * 1024 * 1024;
+export const DEFAULT_GEMINI_SEGMENT_TARGET_BYTES = 15 * 1024 * 1024;
+export const DEFAULT_GEMINI_SEGMENT_MAX_SECONDS = 90;
+
+export function shouldSegmentGeminiVideo(fileSize: number, maxBytes: number): boolean;
+export function planGeminiVideoSegments(params: {
+    fileSize: number;
+    durationMs: number;
+    targetBytes: number;
+    maxSegmentSeconds: number;
+}): { segmentSeconds: number; totalSegments: number };
+```
+
+Calculate `floor(durationSeconds * targetBytes / fileSize)`, clamp to 10–90 seconds, and calculate total segments with `ceil(durationSeconds / segmentSeconds)`. Every direct or segmented Gemini request must stat the staged file and reject it when it exceeds the configured 18MiB value.
+
+- [ ] **Step 5: Verify segment planning GREEN**
+
+Run `cd frontend && node --test tests/geminiSegmentedVideo.test.mjs`.
+
+Expected: direct-limit and segment-planning tests pass.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add frontend/app/lib/server-chat-video.ts frontend/app/lib/server-gemini-video-analysis.ts frontend/tests/geminiSegmentedVideo.test.mjs
+git commit -m "feat: split oversized Gemini videos"
+```
+
+### Task 10: Analyze segments with Gemini and synthesize one result
+
+**Files:**
+- Modify: `frontend/app/lib/server-gemini-media.ts`
+- Modify: `frontend/app/lib/server-gemini-video-analysis.ts`
+- Modify: `frontend/app/lib/server-video-upload-jobs.ts`
+- Modify: `frontend/tests/geminiSegmentedVideo.test.mjs`
+
+- [ ] **Step 1: Add failing orchestration tests**
+
+Stub FFmpeg, media Gemini, text Gemini, and temp-token helpers. Verify these two paths:
+
+```js
+test('Gemini keeps a direct token when compressed video is within 18MiB', async () => {
+  const result = await analyzeUploadedVideoForGemini(directDependencies)
+  assert.equal(result.tempVideoToken, 'direct-token')
+  assert.equal(result.extractedText, '')
+  assert.equal(segmentCalls.length, 0)
+})
+
+test('Gemini analyzes oversized video segments and synthesizes one timeline', async () => {
+  const result = await analyzeUploadedVideoForGemini(segmentedDependencies)
+  assert.equal(result.tempVideoToken, undefined)
+  assert.match(result.extractedText, /综合结论/)
+  assert.equal(maxConcurrentGeminiCalls, 2)
+  assert.equal(segmentAttempts.get(1), 2)
+  assert.deepEqual(deletedSegmentTokens.sort(), ['segment-1', 'segment-2'])
+})
+```
+
+- [ ] **Step 2: Verify RED**
+
+Run `cd frontend && node --test tests/geminiSegmentedVideo.test.mjs`.
+
+Expected: FAIL because the Gemini orchestration function does not exist.
+
+- [ ] **Step 3: Generalize Gemini media analysis**
+
+Keep `describeImageWithGemini` unchanged for existing callers, but implement it through a private media helper. Add:
+
+```ts
+export async function analyzeVideoSegmentWithGemini(
+    base64Data: string,
+    mimeType: string,
+    prompt: string,
+): Promise<string>;
+```
+
+Use the same configured Gemini media endpoint and timeout handling. Send the playable MP4 as inline media and reject empty responses.
+
+- [ ] **Step 4: Implement hybrid orchestration**
+
+Export:
+
+```ts
+export async function analyzeUploadedVideoForGemini(params: {
+    absolutePath: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+    analysisPrompt: string;
+    onStage?: (update: VideoProcessingStageUpdate) => void | Promise<void>;
+}): Promise<ChatAttachmentPayload>;
+```
+
+First stage/compress the full file. If its actual size is at most 18MiB, return the direct token. Otherwise create playable segments, stage each segment, recursively split any staged segment still over 18MiB, and analyze at most two segments concurrently. Retry each failed Gemini segment call twice. Prefix each structured prompt with its real `startMs/endMs`, the user's analysis question, and the fixed fields from the approved design.
+
+After all segments succeed, call `requestYunwuGeminiChat` once with the ordered segment outputs and a synthesis instruction that preserves timeline and directly answers the user question. Return a video attachment with the synthesis plus concise segment evidence in `extractedText` and no `tempVideoToken`. Delete every segment token and the oversized full-video token in `finally` blocks.
+
+- [ ] **Step 5: Integrate the upload job**
+
+Replace the Gemini branch in `runVideoUploadJob` with `analyzeUploadedVideoForGemini`, pass `job.analysisPrompt`, and persist stage messages such as `正在分析第 2/13 段` and `正在综合全部片段`.
+
+- [ ] **Step 6: Verify orchestration GREEN**
+
+```bash
+cd frontend && node --test tests/geminiSegmentedVideo.test.mjs tests/videoChunkUpload.test.mjs tests/videoUploadCompression.test.mjs
+```
+
+Expected: direct, segmented, retry, cleanup, chunked-upload, and existing compression tests pass.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add frontend/app/lib/server-gemini-media.ts frontend/app/lib/server-gemini-video-analysis.ts frontend/app/lib/server-video-upload-jobs.ts frontend/tests/geminiSegmentedVideo.test.mjs
+git commit -m "feat: synthesize segmented Gemini video analysis"
+```
+
+### Task 11: Accept text-only processed video results and verify deployment
+
+**Files:**
+- Modify: `frontend/app/lib/chunked-video-upload.ts`
+- Modify: `frontend/app/api/conversations/[id]/messages/route.ts`
+- Modify: `frontend/.env.example`
+- Modify: `frontend/README.md`
+- Modify: `frontend/tests/videoChunkUpload.test.mjs`
+
+- [ ] **Step 1: Write failing compatibility tests**
+
+Assert a successful upload job is accepted when it has either a token or non-empty extracted text, and Gemini does not reject a processed text-only video:
+
+```js
+assert.match(clientSource, /job\.result\?\.tempVideoToken\s*\|\|\s*job\.result\?\.extractedText/)
+assert.match(messageRouteSource, /attachment\.extractedText\.trim\(\)/)
+```
+
+- [ ] **Step 2: Verify RED**
+
+Run `cd frontend && node --test tests/videoChunkUpload.test.mjs`.
+
+Expected: FAIL because the current client requires `tempVideoToken`.
+
+- [ ] **Step 3: Implement text-only compatibility**
+
+In the browser uploader, accept success when `tempVideoToken` or trimmed `extractedText` exists. In the conversation route, count a Gemini video as unresolved only when it has no inline data, no temp token, and no non-empty extracted text. The existing attachment-context builder then supplies the synthesized analysis to the final chat request.
+
+- [ ] **Step 4: Document the hybrid settings**
+
+Add without secrets:
+
+```dotenv
+GEMINI_VIDEO_MAX_BYTES=18874368
+GEMINI_VIDEO_SEGMENT_TARGET_BYTES=15728640
+GEMINI_VIDEO_SEGMENT_MAX_SECONDS=90
+```
+
+Document direct-versus-segmented behavior, two-call concurrency, retries, cost implications, and immediate segment cleanup.
+
+- [ ] **Step 5: Run final verification**
+
+```bash
+cd frontend && node --test tests/geminiSegmentedVideo.test.mjs tests/videoChunkUpload.test.mjs tests/videoUploadCompression.test.mjs tests/chatRenderIsolation.test.mjs
+cd frontend && npm run build
+```
+
+Then run the full Node suite and changed-file ESLint. Expected: all new focused tests and build pass; any unchanged baseline failure remains separately reported.
+
+- [ ] **Step 6: Commit and integrate**
+
+```bash
+git add frontend/app/lib/chunked-video-upload.ts frontend/app/api/conversations/[id]/messages/route.ts frontend/.env.example frontend/README.md frontend/tests/videoChunkUpload.test.mjs
+git commit -m "feat: support synthesized Gemini video results"
+```
+
+Merge the verified feature branch into `main` and push only after confirming remote `main` has not moved.
