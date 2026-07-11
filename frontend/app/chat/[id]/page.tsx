@@ -43,6 +43,11 @@ import {
 } from '../../lib/formatMessage';
 import { splitStreamingMarkdownBlocks } from '../../lib/streaming-markdown';
 import {
+    readJsonResponse,
+    uploadVideoInChunks,
+    VIDEO_CHUNK_UPLOAD_THRESHOLD_BYTES,
+} from '../../lib/chunked-video-upload';
+import {
     normalizeChatStreamEvent,
     parseChatStreamSseLine,
     type ChatStreamProjection,
@@ -1115,6 +1120,7 @@ export default function ChatPage() {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [videoUploadStatusText, setVideoUploadStatusText] = useState('');
     const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
     const [conversationVideos, setConversationVideos] = useState<ConversationVideoCatalogItem[]>([]);
     const [selectedConversationVideoIds, setSelectedConversationVideoIds] = useState<string[]>([]);
@@ -1755,8 +1761,8 @@ export default function ChatPage() {
         formData.append('responseModel', model);
 
         const response = await fetch('/api/upload', { method: 'POST', body: formData });
-        const data = await response.json();
-        if (data.error) throw new Error(data.error);
+        const data = await readJsonResponse<Record<string, unknown>>(response, '文件上传失败，请稍后重试。');
+        if (typeof data.error === 'string' && data.error) throw new Error(data.error);
 
         return {
             kind: (data.kind || 'document') as ChatAttachmentKind,
@@ -1796,7 +1802,13 @@ export default function ChatPage() {
             setIsUploading(true);
             try {
                 parsedAttachments = await Promise.all(attachedFiles.map(async (attachment) => {
-                    const parsed = await parseAttachedFile(attachment.file, responseModel);
+                    const parsed = attachment.isVideo && attachment.file.size > VIDEO_CHUNK_UPLOAD_THRESHOLD_BYTES
+                        ? await uploadVideoInChunks({
+                            file: attachment.file,
+                            responseModel,
+                            onProgress: (snapshot) => setVideoUploadStatusText(snapshot.message),
+                        })
+                        : await parseAttachedFile(attachment.file, responseModel);
                     return {
                         ...attachment,
                         name: parsed.fileName,
@@ -1815,6 +1827,7 @@ export default function ChatPage() {
                 return;
             } finally {
                 setIsUploading(false);
+                setVideoUploadStatusText('');
             }
         }
 
@@ -2969,7 +2982,9 @@ export default function ChatPage() {
                         )}
                     </div>
                     <span className={styles.inputHint}>
-                        {isStreaming && imageModeEnabled
+                        {isUploading && videoUploadStatusText
+                            ? videoUploadStatusText
+                            : isStreaming && imageModeEnabled
                             ? (imageStatusText || '正在生成图片，通常需要 10 到 40 秒。')
                             : imageModeEnabled
                             ? '当前输入会直接调用绘图能力，回答模型切换不会影响绘图结果。'

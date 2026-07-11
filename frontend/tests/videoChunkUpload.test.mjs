@@ -103,6 +103,7 @@ test('video processing accepts merged files by path and jobs run asynchronously'
   assert.match(jobSource, /void promise/)
   assert.match(jobSource, /服务已重启，请重新上传视频/)
   assert.match(jobSource, /videoUploadChunk\.deleteMany/)
+  assert.match(jobSource, /videoUploadChunk\.upsert/)
   assert.match(jobSource, /20 \* 1024 \* 1024/)
 })
 
@@ -209,4 +210,15 @@ test('safe response parsing converts an HTML timeout into a Chinese upload error
     uploader.readJsonResponse(response, '视频上传失败。'),
     /视频上传超时，请检查网络后重试。/,
   )
+})
+
+test('chat chunks only videos above 20MB and keeps ordinary uploads for smaller files', async () => {
+  const source = await readFile(path.join(frontendRoot, 'app', 'chat', '[id]', 'page.tsx'), 'utf8')
+  assert.match(source, /uploadVideoInChunks/)
+  assert.match(source, /VIDEO_CHUNK_UPLOAD_THRESHOLD_BYTES/)
+  assert.match(source, /attachment\.isVideo/)
+  assert.match(source, /attachment\.file\.size > VIDEO_CHUNK_UPLOAD_THRESHOLD_BYTES/)
+  assert.match(source, /onProgress:/)
+  assert.match(source, /readJsonResponse/)
+  assert.match(source, /fetch\('\/api\/upload'/)
 })

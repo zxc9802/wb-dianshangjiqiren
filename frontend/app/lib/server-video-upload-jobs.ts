@@ -187,11 +187,11 @@ export async function recordVideoUploadChunk(input: {
     }
 
     const stored = await writeVideoChunk({ jobId: job.id, index: input.index, bytes: input.bytes });
-    if (stored.created) {
-        await prisma.videoUploadChunk.create({
-            data: { jobId: job.id, index: input.index, byteSize: stored.byteSize },
-        });
-    }
+    await prisma.videoUploadChunk.upsert({
+        where: { jobId_index: { jobId: job.id, index: input.index } },
+        create: { jobId: job.id, index: input.index, byteSize: stored.byteSize },
+        update: { byteSize: stored.byteSize },
+    });
     const updated = await findOwnedJob(job.id, input.userId);
     return updated ? toSnapshot(updated) : null;
 }
