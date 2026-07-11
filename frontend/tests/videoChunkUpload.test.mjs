@@ -247,3 +247,15 @@ test('Gemini accepts a segmented video result with analysis text and no full-vid
   assert.match(clientSource, /job\.result\?\.tempVideoToken\s*\|\|\s*job\.result\?\.extractedText/)
   assert.match(messageRouteSource, /attachment\.extractedText\.trim\(\)/)
 })
+
+test('Gemini does not resend the original file after segmented analysis returned text', async () => {
+  const chatSource = await readFile(path.join(frontendRoot, 'app', 'chat', '[id]', 'page.tsx'), 'utf8')
+  assert.match(
+    chatSource,
+    /requestAttachments\.some\(\(attachment\) => attachment\.kind === 'video' && !attachment\.tempVideoToken && !attachment\.remoteVideoUrl && !attachment\.extractedText\.trim\(\)\)/,
+  )
+  assert.match(
+    chatSource,
+    /\.filter\(\(attachment\) => attachment\.kind === 'video' && !attachment\.remoteVideoUrl && !attachment\.tempVideoToken && !attachment\.extractedText\?\.trim\(\)\)/,
+  )
+})

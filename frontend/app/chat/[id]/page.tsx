@@ -1969,7 +1969,7 @@ export default function ChatPage() {
             frames: attachment.frames,
         }));
         const shouldSendGeminiVideoDirect = responseModel === 'gemini'
-            && requestAttachments.some((attachment) => attachment.kind === 'video' && !attachment.tempVideoToken && !attachment.remoteVideoUrl);
+            && requestAttachments.some((attachment) => attachment.kind === 'video' && !attachment.tempVideoToken && !attachment.remoteVideoUrl && !attachment.extractedText.trim());
         const optimisticAttachments: MessageAttachment[] = finalAttachments.map((attachment) => ({
             kind: attachment.kind,
             fileName: attachment.name,
@@ -2068,7 +2068,7 @@ export default function ChatPage() {
                     const formData = new FormData();
                     formData.append('payload', JSON.stringify(messagePayload));
                     finalAttachments
-                        .filter((attachment) => attachment.kind === 'video' && !attachment.remoteVideoUrl && !attachment.tempVideoToken)
+                        .filter((attachment) => attachment.kind === 'video' && !attachment.remoteVideoUrl && !attachment.tempVideoToken && !attachment.extractedText?.trim())
                         .forEach((attachment) => {
                             formData.append('videoFiles', attachment.file, attachment.name);
                         });
