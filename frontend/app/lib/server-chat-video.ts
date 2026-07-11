@@ -410,6 +410,64 @@ export async function loadTempVideo(token: string): Promise<TempVideoData> {
     return { buffer, fileName: meta.fileName, mimeType: meta.mimeType, absolutePath };
 }
 
+export async function getTempVideoFileInfo(token: string): Promise<{
+    absolutePath: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+    durationMs?: number;
+}> {
+    const safeToken = sanitizeToken(token);
+    const metaPath = path.join(TEMP_VIDEO_ROOT, safeToken, 'meta.json');
+    const meta = JSON.parse(await fs.readFile(metaPath, 'utf8')) as TempVideoMeta;
+    const absolutePath = path.join(TEMP_VIDEO_ROOT, safeToken, meta.sourceFileName);
+    const stat = await fs.stat(absolutePath);
+    const durationMs = await probeVideoDurationMs(absolutePath).catch(() => undefined);
+    return { absolutePath, fileName: meta.fileName, mimeType: meta.mimeType, fileSize: stat.size, durationMs };
+}
+
+export async function splitVideoFileByTime(params: {
+    absolutePath: string;
+    outputDirectory: string;
+    segmentSeconds: number;
+}): Promise<Array<{ absolutePath: string; durationMs: number }>> {
+    if (!Number.isFinite(params.segmentSeconds) || params.segmentSeconds <= 0) {
+        throw new Error('Invalid video segment duration.');
+    }
+    await fs.mkdir(params.outputDirectory, { recursive: true });
+    const outputPattern = path.join(params.outputDirectory, 'segment-%03d.mp4');
+    await execFileAsync(FFMPEG_COMMAND, [
+        '-y',
+        '-i',
+        params.absolutePath,
+        '-map',
+        '0:v:0',
+        '-map',
+        '0:a?',
+        '-c',
+        'copy',
+        '-f',
+        'segment',
+        '-segment_time',
+        String(params.segmentSeconds),
+        '-reset_timestamps',
+        '1',
+        outputPattern,
+    ]);
+
+    const names = (await fs.readdir(params.outputDirectory))
+        .filter((name) => /^segment-\d+\.mp4$/.test(name))
+        .sort();
+    if (names.length === 0) {
+        throw new Error('FFmpeg did not create video segments.');
+    }
+    return Promise.all(names.map(async (name) => {
+        const absolutePath = path.join(params.outputDirectory, name);
+        const durationMs = await probeVideoDurationMs(absolutePath);
+        return { absolutePath, durationMs };
+    }));
+}
+
 export async function deleteTempVideo(token: string): Promise<void> {
     await fs.rm(path.join(TEMP_VIDEO_ROOT, sanitizeToken(token)), { recursive: true, force: true }).catch(() => undefined);
 }
