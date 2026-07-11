@@ -34,7 +34,7 @@ async function loadGeminiVideoModule(stubs = {}) {
     process,
     console,
     Buffer,
-    setTimeout,
+    setTimeout: stubs.__setTimeout || setTimeout,
     clearTimeout,
   })
   vm.runInContext(transpiled, context, { filename: sourcePath })
@@ -123,4 +123,45 @@ test('Gemini analyzes oversized video segments, retries, cleans up, and synthesi
   assert.equal(maxActive, 2)
   assert.equal(attempts.get(2), 2)
   assert.deepEqual(deleted.sort(), ['full-token', 'segment-1', 'segment-2'])
+})
+
+test('Gemini cleans up queued segment tokens when analysis fails permanently', async () => {
+  const deleted = []
+  const module = await loadGeminiVideoModule({
+    __setTimeout: (callback) => {
+      callback()
+      return 0
+    },
+    './server-env': { readServerEnv: () => undefined },
+    './server-chat-video': {
+      storeUploadedVideoFileForModelUpload: async ({ fileName }) => fileName === 'clip.mp4'
+        ? { tempVideoToken: 'full-token', fileSize: 30 * 1024 * 1024, mimeType: 'video/mp4' }
+        : { tempVideoToken: fileName.replace('.mp4', ''), fileSize: 10 * 1024 * 1024, mimeType: 'video/mp4' },
+      getTempVideoFileInfo: async (token) => token === 'full-token'
+        ? { absolutePath: '/tmp/full.mp4', fileName: 'clip.mp4', mimeType: 'video/mp4', fileSize: 30 * 1024 * 1024, durationMs: 240_000 }
+        : { absolutePath: `/tmp/${token}.mp4`, fileName: `${token}.mp4`, mimeType: 'video/mp4', fileSize: 10 * 1024 * 1024, durationMs: 60_000 },
+      splitVideoFileByTime: async () => Array.from({ length: 4 }, (_, index) => ({
+        absolutePath: `/tmp/segment-${String(index).padStart(3, '0')}.mp4`,
+        durationMs: 60_000,
+        fileSize: 10 * 1024 * 1024,
+      })),
+      loadTempVideo: async (token) => ({ buffer: Buffer.from(token), mimeType: 'video/mp4' }),
+      deleteTempVideo: async (token) => deleted.push(token),
+    },
+    './server-gemini-media': {
+      analyzeVideoSegmentWithGemini: async () => { throw new Error('permanent failure') },
+    },
+    './yunwu-gemini-chat': { requestYunwuGeminiChat: async () => 'unused' },
+  })
+
+  await assert.rejects(() => module.analyzeUploadedVideoForGemini({
+    absolutePath: '/tmp/source.mp4', fileName: 'clip.mp4', mimeType: 'video/mp4', fileSize: 184 * 1024 * 1024, analysisPrompt: '分析节奏',
+  }), /第 1 段分析失败/)
+  assert.deepEqual(deleted.sort(), [
+    'full-token',
+    'segment-000',
+    'segment-001',
+    'segment-002',
+    'segment-003',
+  ])
 })

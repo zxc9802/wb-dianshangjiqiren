@@ -66,6 +66,7 @@ async function prepareSegmentUnderLimit(params: {
     startMs: number;
     maxBytes: number;
     workRoot: string;
+    tokensToCleanup: Set<string>;
     depth?: number;
 }): Promise<PreparedSegment[]> {
     const depth = params.depth || 0;
@@ -76,6 +77,7 @@ async function prepareSegmentUnderLimit(params: {
         mimeType: 'video/mp4',
         fileSize: params.fileSize,
     });
+    params.tokensToCleanup.add(staged.tempVideoToken);
     const info = await getTempVideoFileInfo(staged.tempVideoToken);
     if (!shouldSegmentGeminiVideo(info.fileSize, params.maxBytes)) {
         return [{ token: staged.tempVideoToken, startMs: params.startMs, endMs: params.startMs + params.durationMs }];
@@ -83,6 +85,7 @@ async function prepareSegmentUnderLimit(params: {
 
     if (params.durationMs <= 10_000 || depth >= 6) {
         await deleteTempVideo(staged.tempVideoToken);
+        params.tokensToCleanup.delete(staged.tempVideoToken);
         throw new Error(`视频片段 ${formatTimestamp(params.startMs)}-${formatTimestamp(params.startMs + params.durationMs)} 压缩后仍超过18MB。`);
     }
 
@@ -93,6 +96,7 @@ async function prepareSegmentUnderLimit(params: {
         segmentSeconds: Math.max(10, Math.floor(params.durationMs / 2000)),
     });
     await deleteTempVideo(staged.tempVideoToken);
+    params.tokensToCleanup.delete(staged.tempVideoToken);
 
     const prepared: PreparedSegment[] = [];
     let childStartMs = params.startMs;
@@ -104,6 +108,7 @@ async function prepareSegmentUnderLimit(params: {
             startMs: childStartMs,
             maxBytes: params.maxBytes,
             workRoot: params.workRoot,
+            tokensToCleanup: params.tokensToCleanup,
             depth: depth + 1,
         }));
         childStartMs += child.durationMs;
@@ -116,6 +121,7 @@ async function analyzeWithRetry(params: {
     index: number;
     total: number;
     analysisPrompt: string;
+    tokensToCleanup: Set<string>;
     onStage?: (update: VideoProcessingStageUpdate) => void | Promise<void>;
 }): Promise<string> {
     await params.onStage?.({
@@ -153,12 +159,14 @@ async function analyzeWithRetry(params: {
         throw lastError instanceof Error ? lastError : new Error(`第 ${params.index + 1} 段分析失败。`);
     } finally {
         await deleteTempVideo(params.segment.token);
+        params.tokensToCleanup.delete(params.segment.token);
     }
 }
 
 async function analyzeSegmentsWithConcurrency(params: {
     segments: PreparedSegment[];
     analysisPrompt: string;
+    tokensToCleanup: Set<string>;
     onStage?: (update: VideoProcessingStageUpdate) => void | Promise<void>;
 }): Promise<string[]> {
     const results = new Array<string>(params.segments.length);
@@ -173,6 +181,7 @@ async function analyzeSegmentsWithConcurrency(params: {
                 index,
                 total: params.segments.length,
                 analysisPrompt: params.analysisPrompt,
+                tokensToCleanup: params.tokensToCleanup,
                 onStage: params.onStage,
             });
         }
@@ -222,6 +231,7 @@ export async function analyzeUploadedVideoForGemini(params: {
     const workRoot = path.join(process.cwd(), 'storage', 'gemini-video-segments', randomUUID());
     await fs.mkdir(workRoot, { recursive: true });
     let fullToken: string | undefined = full.tempVideoToken;
+    const segmentTokensToCleanup = new Set<string>();
     try {
         await params.onStage?.({ stage: 'analyzing', message: '正在切分视频。' });
         const plan = planGeminiVideoSegments({
@@ -248,11 +258,17 @@ export async function analyzeUploadedVideoForGemini(params: {
                 startMs,
                 maxBytes,
                 workRoot,
+                tokensToCleanup: segmentTokensToCleanup,
             }));
             startMs += segment.durationMs;
         }
 
-        const segmentResults = await analyzeSegmentsWithConcurrency({ segments, analysisPrompt, onStage: params.onStage });
+        const segmentResults = await analyzeSegmentsWithConcurrency({
+            segments,
+            analysisPrompt,
+            tokensToCleanup: segmentTokensToCleanup,
+            onStage: params.onStage,
+        });
         await params.onStage?.({ stage: 'analyzing', message: '正在综合全部片段。' });
         const evidence = segmentResults.map((result, index) => {
             const segment = segments[index];
@@ -279,6 +295,7 @@ export async function analyzeUploadedVideoForGemini(params: {
         };
     } finally {
         if (fullToken) await deleteTempVideo(fullToken).catch(() => undefined);
+        await Promise.all(Array.from(segmentTokensToCleanup, (token) => deleteTempVideo(token)));
         await fs.rm(workRoot, { recursive: true, force: true }).catch(() => undefined);
     }
 }
