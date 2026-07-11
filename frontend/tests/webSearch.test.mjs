@@ -98,9 +98,10 @@ test('web search mode on calls Yunwu and appends search context', async () => {
   assert.equal(calls[0].url, 'https://yunwu.ai/v1/chat/completions')
   assert.equal(calls[0].headers.Authorization, 'Bearer test-key')
   assert.deepEqual(calls[0].body, {
-    model: 'gpt-4o-search-preview',
-    web_search_options: {},
+    model: 'deepseek-v3-search',
     messages: [{ role: 'user', content: 'What is quantum computing?' }],
+    max_tokens: 256,
+    stream: false,
   })
   assert.equal(result.usedWebSearch, true)
   assert.match(result.systemPrompt, /# 联网搜索参考/)

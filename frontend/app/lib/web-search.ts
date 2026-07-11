@@ -6,7 +6,7 @@ import {
 import type { OpenAIChatMessage } from './yunwu-openai-chat';
 
 const DEFAULT_YUNWU_SEARCH_API_URL = 'https://yunwu.ai/v1/chat/completions';
-const YUNWU_SEARCH_MODEL = 'gpt-4o-search-preview';
+const YUNWU_SEARCH_MODEL = 'deepseek-v3-search';
 const MAX_QUERY_CHARS = 500;
 
 type YunwuSearchPayload = {
@@ -103,8 +103,9 @@ async function searchYunwu(query: string): Promise<string> {
         },
         body: JSON.stringify({
             model: YUNWU_SEARCH_MODEL,
-            web_search_options: {},
             messages: [{ role: 'user', content: query }],
+            max_tokens: 256,
+            stream: false,
         }),
     });
 
