@@ -100,3 +100,26 @@ test('video processing accepts merged files by path and jobs run asynchronously'
   assert.match(jobSource, /videoUploadChunk\.deleteMany/)
   assert.match(jobSource, /20 \* 1024 \* 1024/)
 })
+
+test('video upload routes authenticate and delegate create, chunk, complete, and polling', async () => {
+  const routePaths = [
+    ['app', 'api', 'video-uploads', 'route.ts'],
+    ['app', 'api', 'video-uploads', '[jobId]', 'chunks', '[index]', 'route.ts'],
+    ['app', 'api', 'video-uploads', '[jobId]', 'complete', 'route.ts'],
+    ['app', 'api', 'video-uploads', '[jobId]', 'route.ts'],
+  ]
+  const sources = await Promise.all(routePaths.map((segments) => (
+    readFile(path.join(frontendRoot, ...segments), 'utf8')
+  )))
+
+  for (const source of sources) {
+    assert.match(source, /getUserId/)
+    assert.match(source, /errorResponse/)
+    assert.match(source, /runtime = 'nodejs'/)
+  }
+  assert.match(sources[0], /createVideoUploadJob/)
+  assert.match(sources[1], /recordVideoUploadChunk/)
+  assert.match(sources[1], /arrayBuffer/)
+  assert.match(sources[2], /completeVideoUpload/)
+  assert.match(sources[3], /getVideoUploadJob/)
+})
