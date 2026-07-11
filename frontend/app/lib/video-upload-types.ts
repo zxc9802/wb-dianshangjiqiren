@@ -21,4 +21,5 @@ export interface CreateVideoUploadInput {
     fileSize: number;
     mimeType: string;
     responseModel: string;
+    analysisPrompt: string;
 }

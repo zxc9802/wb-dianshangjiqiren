@@ -1806,6 +1806,7 @@ export default function ChatPage() {
                         ? await uploadVideoInChunks({
                             file: attachment.file,
                             responseModel,
+                            analysisPrompt: rawText,
                             onProgress: (snapshot) => setVideoUploadStatusText(snapshot.message),
                         })
                         : await parseAttachedFile(attachment.file, responseModel);

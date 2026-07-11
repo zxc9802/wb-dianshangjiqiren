@@ -43,6 +43,7 @@ type JobWithCount = {
     fileSize: number;
     mimeType: string;
     responseModel: string;
+    analysisPrompt: string;
     chunkSize: number;
     totalChunks: number;
     status: string;
@@ -151,6 +152,7 @@ export async function createVideoUploadJob(input: CreateVideoUploadInput & { use
             fileSize: input.fileSize,
             mimeType: input.mimeType || VIDEO_MIME_BY_EXTENSION[path.extname(input.fileName).toLowerCase()],
             responseModel,
+            analysisPrompt: input.analysisPrompt.trim().slice(0, 4000),
             chunkSize,
             totalChunks,
             status: 'uploading',

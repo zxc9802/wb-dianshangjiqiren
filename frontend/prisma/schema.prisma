@@ -47,6 +47,7 @@ model VideoUploadJob {
   fileSize      Int       @map("file_size")
   mimeType      String    @map("mime_type")
   responseModel String    @map("response_model")
+  analysisPrompt String   @default("") @map("analysis_prompt") @db.Text
   chunkSize     Int       @map("chunk_size")
   totalChunks   Int       @map("total_chunks")
   status        String    @default("uploading")

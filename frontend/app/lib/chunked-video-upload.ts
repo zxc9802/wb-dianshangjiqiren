@@ -69,6 +69,7 @@ async function fetchJobEnvelope(
 export async function uploadVideoInChunks(options: {
     file: File;
     responseModel: string;
+    analysisPrompt: string;
     onProgress?: (snapshot: VideoUploadJobSnapshot) => void;
     fetchImpl?: typeof fetch;
     sleep?: (ms: number) => Promise<void>;
@@ -83,6 +84,7 @@ export async function uploadVideoInChunks(options: {
             fileSize: options.file.size,
             mimeType: options.file.type,
             responseModel: options.responseModel,
+            analysisPrompt: options.analysisPrompt,
         }),
     }, '无法创建视频上传任务。');
     options.onProgress?.(created);

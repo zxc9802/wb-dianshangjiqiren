@@ -186,6 +186,7 @@ test('browser uploader limits concurrency, retries a failed chunk, and polls to 
   const result = await uploader.uploadVideoInChunks({
     file: new File([new Uint8Array(13)], 'clip.mp4', { type: 'video/mp4' }),
     responseModel: 'gemini',
+    analysisPrompt: '分析镜头和节奏',
     fetchImpl,
     sleep: async () => {},
     onProgress: (snapshot) => progress.push(snapshot),
@@ -221,4 +222,19 @@ test('chat chunks only videos above 20MB and keeps ordinary uploads for smaller 
   assert.match(source, /onProgress:/)
   assert.match(source, /readJsonResponse/)
   assert.match(source, /fetch\('\/api\/upload'/)
+})
+
+test('large video jobs preserve the current user analysis question', async () => {
+  const [schema, types, client, chat, createRoute] = await Promise.all([
+    readFile(path.join(frontendRoot, 'prisma', 'schema.prisma'), 'utf8'),
+    readFile(path.join(frontendRoot, 'app', 'lib', 'video-upload-types.ts'), 'utf8'),
+    readFile(path.join(frontendRoot, 'app', 'lib', 'chunked-video-upload.ts'), 'utf8'),
+    readFile(path.join(frontendRoot, 'app', 'chat', '[id]', 'page.tsx'), 'utf8'),
+    readFile(path.join(frontendRoot, 'app', 'api', 'video-uploads', 'route.ts'), 'utf8'),
+  ])
+  assert.match(schema, /analysisPrompt\s+String\s+@default\(""\)/)
+  assert.match(types, /analysisPrompt: string/)
+  assert.match(client, /analysisPrompt: options\.analysisPrompt/)
+  assert.match(chat, /analysisPrompt: rawText/)
+  assert.match(createRoute, /analysisPrompt/)
 })
