@@ -116,6 +116,22 @@ export async function describeImageWithGemini(
     mimeType: string,
     prompt = '请详细描述这张图片的内容，包括文字、主体、场景、布局、颜色和任何可见信息。',
 ): Promise<string> {
+    return analyzeInlineMediaWithGemini(base64Data, mimeType, prompt);
+}
+
+export async function analyzeVideoSegmentWithGemini(
+    base64Data: string,
+    mimeType: string,
+    prompt: string,
+): Promise<string> {
+    return analyzeInlineMediaWithGemini(base64Data, mimeType, prompt);
+}
+
+async function analyzeInlineMediaWithGemini(
+    base64Data: string,
+    mimeType: string,
+    prompt: string,
+): Promise<string> {
     const apiKey = readServerEnv('YUNWU_UPLOAD_API_KEY') || readServerEnv('GEMINI_CHAT_API_KEY') || readServerEnv('AI_API_KEY') || readServerEnv('YUNWU_CHAT_API_KEY');
     if (!apiKey) {
         throw new AppError('Missing Gemini media API key configuration', 500);

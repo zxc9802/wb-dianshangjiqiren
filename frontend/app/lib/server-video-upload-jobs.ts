@@ -6,9 +6,9 @@ import { prisma } from './prisma';
 import { readServerEnv } from './server-env';
 import {
     processUploadedVideoFile,
-    storeUploadedVideoFileForModelUpload,
     type VideoProcessingStageUpdate,
 } from './server-chat-video';
+import { analyzeUploadedVideoForGemini } from './server-gemini-video-analysis';
 import {
     cleanupStaleVideoUploadDirectories,
     cleanupVideoUploadChunks,
@@ -231,24 +231,15 @@ export async function runVideoUploadJob(job: JobWithChunks): Promise<void> {
 
         let result: ChatAttachmentPayload;
         if (job.responseModel === 'gemini') {
-            const staged = await storeUploadedVideoFileForModelUpload({
+            result = await analyzeUploadedVideoForGemini({
                 absolutePath: mergedPath,
                 fileName: job.fileName,
                 mimeType: job.mimeType,
                 fileSize: job.fileSize,
+                analysisPrompt: job.analysisPrompt,
                 onStage: (update) => updateProcessingStage(job.id, update),
             });
             mergedPath = undefined;
-            result = {
-                kind: 'video',
-                fileName: job.fileName,
-                fileSize: staged.fileSize,
-                mimeType: staged.mimeType,
-                extractedText: '',
-                transcript: '',
-                frames: [],
-                tempVideoToken: staged.tempVideoToken,
-            };
         } else {
             const processed = await processUploadedVideoFile({
                 absolutePath: mergedPath,

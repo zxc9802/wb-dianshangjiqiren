@@ -430,7 +430,7 @@ export async function splitVideoFileByTime(params: {
     absolutePath: string;
     outputDirectory: string;
     segmentSeconds: number;
-}): Promise<Array<{ absolutePath: string; durationMs: number }>> {
+}): Promise<Array<{ absolutePath: string; durationMs: number; fileSize: number }>> {
     if (!Number.isFinite(params.segmentSeconds) || params.segmentSeconds <= 0) {
         throw new Error('Invalid video segment duration.');
     }
@@ -463,8 +463,8 @@ export async function splitVideoFileByTime(params: {
     }
     return Promise.all(names.map(async (name) => {
         const absolutePath = path.join(params.outputDirectory, name);
-        const durationMs = await probeVideoDurationMs(absolutePath);
-        return { absolutePath, durationMs };
+        const [durationMs, stat] = await Promise.all([probeVideoDurationMs(absolutePath), fs.stat(absolutePath)]);
+        return { absolutePath, durationMs, fileSize: stat.size };
     }));
 }
 
