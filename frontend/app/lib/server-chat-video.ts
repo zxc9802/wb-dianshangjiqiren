@@ -57,12 +57,14 @@ const isTikTokPlaceholderAssetUrl = (remoteUrl: string): boolean => {
 interface TempVideoMeta { token: string; fileName: string; mimeType: string; createdAt: string; sourceFileName: string }
 interface ExtractedFrameFile extends ChatAttachmentFrame { absolutePath: string }
 export interface ProcessedVideoUpload { extractedText: string; transcript: string; durationMs?: number; previewUrl?: string; frames: ChatAttachmentFrame[]; tempVideoToken?: string }
+export interface VideoProcessingStageUpdate { stage: 'compressing' | 'analyzing'; message: string }
 export interface ProcessUploadedVideoOptions {
     includeFrameDescriptions?: boolean;
     includeTranscript?: boolean;
     requireFrames?: boolean;
     requireFrameDescriptions?: boolean;
     requireTranscript?: boolean;
+    onStage?: (update: VideoProcessingStageUpdate) => void | Promise<void>;
 }
 export interface TempVideoData { buffer: Buffer; fileName: string; mimeType: string; absolutePath: string }
 export interface DownloadedRemoteVideo extends ProcessedVideoUpload { buffer: Buffer; fileName: string; mimeType: string; fileSize: number; remotePlatform: RemoteVideoPlatform; downloadMethod: RemoteVideoDownloadMethod }
@@ -88,6 +90,40 @@ export async function storeUploadedVideo(params: { buffer: Buffer; fileName: str
 export async function storeUploadedVideoForModelUpload(params: { buffer: Buffer; fileName: string; mimeType: string }): Promise<{ tempVideoToken: string; fileSize: number; mimeType: string }> {
     await cleanupStaleTempVideos();
     const temp = await createTempVideo(params.buffer, params.fileName, params.mimeType);
+    return stageTempVideoForModelUpload({
+        temp,
+        inputSizeBytes: params.buffer.length,
+        fileName: params.fileName,
+        mimeType: params.mimeType,
+    });
+}
+
+export async function storeUploadedVideoFileForModelUpload(params: {
+    absolutePath: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+    onStage?: (update: VideoProcessingStageUpdate) => void | Promise<void>;
+}): Promise<{ tempVideoToken: string; fileSize: number; mimeType: string }> {
+    await cleanupStaleTempVideos();
+    const temp = await createTempVideoFromFile(params.absolutePath, params.fileName, params.mimeType);
+    return stageTempVideoForModelUpload({
+        temp,
+        inputSizeBytes: params.fileSize,
+        fileName: params.fileName,
+        mimeType: params.mimeType,
+        onStage: params.onStage,
+    });
+}
+
+async function stageTempVideoForModelUpload(params: {
+    temp: { token: string; absolutePath: string };
+    inputSizeBytes: number;
+    fileName: string;
+    mimeType: string;
+    onStage?: (update: VideoProcessingStageUpdate) => void | Promise<void>;
+}): Promise<{ tempVideoToken: string; fileSize: number; mimeType: string }> {
+    const { temp } = params;
     let durationMs: number | undefined;
     try {
         durationMs = await probeVideoDurationMs(temp.absolutePath);
@@ -101,9 +137,10 @@ export async function storeUploadedVideoForModelUpload(params: { buffer: Buffer;
     let stagedPath = temp.absolutePath;
     let stagedMimeType = params.mimeType;
     try {
+        await params.onStage?.({ stage: 'compressing', message: '正在压缩视频。' });
         const compressed = await compressTempVideoIfNeeded({
             temp,
-            inputSizeBytes: params.buffer.length,
+            inputSizeBytes: params.inputSizeBytes,
             durationMs,
             fileName: params.fileName,
         });
@@ -229,15 +266,41 @@ function buildProcessingStageError(fileName: string, stage: string, error: unkno
 }
 
 export async function processUploadedVideo(params: { buffer: Buffer; fileName: string; mimeType: string }, options: ProcessUploadedVideoOptions = {}): Promise<ProcessedVideoUpload> {
+    await cleanupStaleTempVideos();
+    const temp = await createTempVideo(params.buffer, params.fileName, params.mimeType);
+    return processTempVideo(temp, {
+        fileName: params.fileName,
+        inputSizeBytes: params.buffer.length,
+    }, options);
+}
+
+export async function processUploadedVideoFile(params: {
+    absolutePath: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+}, options: ProcessUploadedVideoOptions = {}): Promise<ProcessedVideoUpload> {
+    await cleanupStaleTempVideos();
+    const temp = await createTempVideoFromFile(params.absolutePath, params.fileName, params.mimeType);
+    return processTempVideo(temp, {
+        fileName: params.fileName,
+        inputSizeBytes: params.fileSize,
+    }, options);
+}
+
+async function processTempVideo(
+    temp: { token: string; absolutePath: string },
+    params: { fileName: string; inputSizeBytes: number },
+    options: ProcessUploadedVideoOptions,
+): Promise<ProcessedVideoUpload> {
     const {
         includeFrameDescriptions = true,
         includeTranscript = true,
         requireFrames = false,
         requireFrameDescriptions = false,
         requireTranscript = false,
+        onStage,
     } = options;
-    await cleanupStaleTempVideos();
-    const temp = await createTempVideo(params.buffer, params.fileName, params.mimeType);
     let durationMs: number | undefined;
     let frames: ExtractedFrameFile[] = [];
     let transcript = '';
@@ -250,6 +313,10 @@ export async function processUploadedVideo(params: { buffer: Buffer; fileName: s
                 fileName: params.fileName,
                 error: getProcessingErrorMessage(error),
             });
+        }
+
+        if (includeFrameDescriptions || includeTranscript) {
+            await onStage?.({ stage: 'analyzing', message: '正在抽帧和分析视频。' });
         }
 
         if (includeFrameDescriptions) {
@@ -306,9 +373,10 @@ export async function processUploadedVideo(params: { buffer: Buffer; fileName: s
         }
 
         try {
+            await onStage?.({ stage: 'compressing', message: '正在压缩视频。' });
             await compressTempVideoIfNeeded({
                 temp,
-                inputSizeBytes: params.buffer.length,
+                inputSizeBytes: params.inputSizeBytes,
                 durationMs,
                 fileName: params.fileName,
             });
@@ -437,6 +505,30 @@ async function createTempVideo(buffer: Buffer, fileName: string, mimeType: strin
     const absolutePath = path.join(directory, sourceFileName);
     await fs.mkdir(directory, { recursive: true });
     await fs.writeFile(absolutePath, buffer);
+    const meta: TempVideoMeta = { token, fileName, mimeType, createdAt: new Date().toISOString(), sourceFileName };
+    await fs.writeFile(path.join(directory, 'meta.json'), JSON.stringify(meta), 'utf8');
+    return { token, absolutePath };
+}
+
+async function createTempVideoFromFile(sourcePath: string, fileName: string, mimeType: string): Promise<{ token: string; absolutePath: string }> {
+    const token = `${Date.now()}-${randomUUID()}`;
+    const extension = path.extname(fileName) || '.mp4';
+    const directory = path.join(TEMP_VIDEO_ROOT, token);
+    const sourceFileName = `source${extension.toLowerCase()}`;
+    const absolutePath = path.join(directory, sourceFileName);
+    await fs.mkdir(directory, { recursive: true });
+
+    try {
+        await fs.rename(sourcePath, absolutePath);
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EXDEV') {
+            await fs.rm(directory, { recursive: true, force: true }).catch(() => undefined);
+            throw error;
+        }
+        await fs.copyFile(sourcePath, absolutePath);
+        await fs.rm(sourcePath, { force: true });
+    }
+
     const meta: TempVideoMeta = { token, fileName, mimeType, createdAt: new Date().toISOString(), sourceFileName };
     await fs.writeFile(path.join(directory, 'meta.json'), JSON.stringify(meta), 'utf8');
     return { token, absolutePath };

@@ -118,6 +118,10 @@ export async function cleanupVideoUploadDirectory(jobId: string): Promise<void> 
     await fs.rm(getJobDirectory(jobId), { recursive: true, force: true }).catch(() => undefined);
 }
 
+export async function cleanupVideoUploadChunks(jobId: string): Promise<void> {
+    await fs.rm(path.join(getJobDirectory(jobId), 'chunks'), { recursive: true, force: true }).catch(() => undefined);
+}
+
 export async function cleanupStaleVideoUploadDirectories(ttlMs: number): Promise<void> {
     const root = getUploadRoot();
     let entries: Array<import('node:fs').Dirent>;

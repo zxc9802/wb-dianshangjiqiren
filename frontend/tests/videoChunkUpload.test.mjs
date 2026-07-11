@@ -83,3 +83,20 @@ test('chunk storage is idempotent and merges chunks in index order', async () =>
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test('video processing accepts merged files by path and jobs run asynchronously', async () => {
+  const [videoSource, jobSource] = await Promise.all([
+    readFile(path.join(frontendRoot, 'app', 'lib', 'server-chat-video.ts'), 'utf8'),
+    readFile(path.join(frontendRoot, 'app', 'lib', 'server-video-upload-jobs.ts'), 'utf8'),
+  ])
+
+  assert.match(videoSource, /export async function processUploadedVideoFile/)
+  assert.match(videoSource, /export async function storeUploadedVideoFileForModelUpload/)
+  assert.match(videoSource, /onStage\?:/)
+  assert.match(jobSource, /activeVideoUploadJobs/)
+  assert.match(jobSource, /completeVideoUpload/)
+  assert.match(jobSource, /void promise/)
+  assert.match(jobSource, /服务已重启，请重新上传视频/)
+  assert.match(jobSource, /videoUploadChunk\.deleteMany/)
+  assert.match(jobSource, /20 \* 1024 \* 1024/)
+})

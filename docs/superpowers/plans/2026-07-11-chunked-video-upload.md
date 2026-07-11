@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Upload videos up to 500MB in retryable 5MiB chunks, then merge and process them asynchronously behind a persisted `jobId` that the chat page polls.
+**Goal:** Keep videos at or below 20MiB on the existing upload path, while uploading larger videos up to 500MB in retryable 5MiB chunks and processing them asynchronously behind a persisted `jobId`.
 
-**Architecture:** Video binaries live only in a task-specific local directory while PostgreSQL stores ownership, chunk receipts, state, progress, and the final attachment payload. The browser uploads at most three chunks concurrently, calls a non-blocking completion endpoint, polls every two seconds, and then resumes the existing message-send path with the processed attachment.
+**Architecture:** Video binaries live only in a task-specific local directory while PostgreSQL temporarily stores ownership, chunk receipts, state, progress, and the final attachment payload. Chunk rows and disk parts are deleted immediately after merge; terminal job metadata expires after two hours. The browser uses the existing endpoint through 20MiB, otherwise uploads at most three chunks concurrently, calls a non-blocking completion endpoint, polls every two seconds, and resumes the existing message-send path.
 
 **Tech Stack:** Next.js 16 route handlers, React 19, TypeScript, Prisma/PostgreSQL, Node filesystem streams, native `fetch`, FFmpeg, Node test runner.
 
@@ -319,7 +319,7 @@ export async function getVideoUploadJob(input: { jobId: string; userId: string }
 export async function waitForActiveVideoUploadJob(jobId: string): Promise<void>;
 ```
 
-Use defaults of 500MB, 5MiB, and 2 hours from the approved environment variables. Validate extensions against `.mp4`, `.mov`, `.webm`, and `.m4v`. Record chunks with a unique `(jobId, index)` row, calculate progress from `_count.chunks`, verify every expected index and byte length before completion, start the background Promise without awaiting it, and store the current Promise in a global Map.
+Use a fixed chunking threshold of 20MiB plus defaults of 500MB, 5MiB, and 2 hours from the approved environment variables. Reject creation when `fileSize <= 20 * 1024 * 1024`; those videos must use `/api/upload`. Validate extensions against `.mp4`, `.mov`, `.webm`, and `.m4v`. Record chunks with a unique `(jobId, index)` row, calculate progress from `_count.chunks`, verify every expected index and byte length before completion, then delete all `VideoUploadChunk` rows and disk part files immediately after the merged source is complete. Start the background Promise without awaiting it and store the current Promise in a global Map.
 
 For Gemini call `storeUploadedVideoFileForModelUpload`; for other models call `processUploadedVideoFile` with the existing transcript/frame flags. Persist the returned `ChatAttachmentPayload` as JSON. Always remove remaining chunk and merged-source files after terminal success or failure; do not delete the existing processed temp-token directory. The merged video must move directly into that token directory rather than being reloaded into a Buffer.
 
@@ -486,6 +486,7 @@ test('chat uses chunk uploads only for videos and keeps ordinary uploads for oth
   const source = await readFile(path.join(frontendRoot, 'app', 'chat', '[id]', 'page.tsx'), 'utf8')
   assert.match(source, /uploadVideoInChunks/)
   assert.match(source, /attachment\.isVideo/)
+  assert.match(source, /20 \* 1024 \* 1024/)
   assert.match(source, /onProgress:/)
   assert.match(source, /readJsonResponse/)
   assert.match(source, /视频上传/)
@@ -501,7 +502,7 @@ Expected: FAIL because the chat page still sends videos to `/api/upload`.
 
 - [ ] **Step 3: Integrate video jobs without changing image/document behavior**
 
-Import `uploadVideoInChunks` and `readJsonResponse`. Add `videoUploadStatusText` state. During attachment preparation:
+Import `uploadVideoInChunks` and `readJsonResponse`. Add `videoUploadStatusText` state. During attachment preparation, call the chunked uploader only when `attachment.isVideo && attachment.file.size > 20 * 1024 * 1024`; 20MiB and smaller videos continue through the existing `/api/upload`. The large-video branch is:
 
 ```ts
 if (attachment.isVideo) {
