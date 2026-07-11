@@ -35,8 +35,49 @@ model User {
   createdInviteCodes       InviteCode[]        @relation("InviteCodeCreator")
   usedInviteCodes          InviteCode[]        @relation("InviteCodeConsumer")
   videoSsoTickets          VideoSsoTicket[]
+  videoUploadJobs          VideoUploadJob[]
 
   @@map("users")
+}
+
+model VideoUploadJob {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  fileName      String    @map("file_name")
+  fileSize      Int       @map("file_size")
+  mimeType      String    @map("mime_type")
+  responseModel String    @map("response_model")
+  chunkSize     Int       @map("chunk_size")
+  totalChunks   Int       @map("total_chunks")
+  status        String    @default("uploading")
+  stage         String    @default("uploading")
+  message       String    @default("准备上传视频")
+  result        Json?
+  error         String?   @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  completedAt   DateTime? @map("completed_at")
+
+  user   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chunks VideoUploadChunk[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, updatedAt])
+  @@map("video_upload_jobs")
+}
+
+model VideoUploadChunk {
+  id        String   @id @default(uuid())
+  jobId     String   @map("job_id")
+  index     Int
+  byteSize  Int      @map("byte_size")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  job VideoUploadJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, index])
+  @@index([jobId])
+  @@map("video_upload_chunks")
 }
 
 model VideoSsoTicket {
