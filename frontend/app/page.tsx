@@ -52,6 +52,7 @@ interface BotInfo {
   path: string;
   requiresAuth: boolean;
   videoSite?: VideoSiteKey;
+  openInNewTab?: boolean;
 }
 
 const WF_TEMPLATES = [
@@ -118,6 +119,7 @@ const DETAIL_IMAGE_AGENT_TOOL: BotInfo = {
   pointsPerUse: 0,
   isTrial: false,
   requiresAuth: true,
+  openInNewTab: true,
 };
 
 const BUYER_SHOW_TOOL: BotInfo = {
@@ -131,6 +133,7 @@ const BUYER_SHOW_TOOL: BotInfo = {
   pointsPerUse: 0,
   isTrial: false,
   requiresAuth: true,
+  openInNewTab: true,
 };
 
 const KB_CHAT_TOOL: BotInfo = {
@@ -144,6 +147,7 @@ const KB_CHAT_TOOL: BotInfo = {
   pointsPerUse: 0,
   isTrial: false,
   requiresAuth: true,
+  openInNewTab: true,
 };
 
 const COPYWRITING_AGENT_TOOL: BotInfo = {
@@ -157,6 +161,7 @@ const COPYWRITING_AGENT_TOOL: BotInfo = {
   pointsPerUse: 0,
   isTrial: false,
   requiresAuth: true,
+  openInNewTab: true,
 };
 
 const VIDEO_WORKBENCH_TOOLS: BotInfo[] = [
@@ -565,6 +570,10 @@ export default function HomePage() {
   };
 
   const openBot = async (bot: BotInfo) => {
+    if (bot.openInNewTab) {
+      window.open(bot.path, '_blank', 'noopener,noreferrer');
+      return;
+    }
     if (bot.videoSite) {
       const launchPath = `${bot.path}?autostart=1`;
       if (!isAuthenticated) {
