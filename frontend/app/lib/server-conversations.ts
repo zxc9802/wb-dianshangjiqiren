@@ -1,6 +1,8 @@
 import { Prisma } from '@prisma/client';
 import { AppError } from './auth';
+import { BUILTIN_BOT_MAP } from './builtin-bots';
 import { prisma } from './prisma';
+import { getSystemPromptBySortOrder } from './systemPrompts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CUSTOM_BOT_CATEGORY = 'My Bot';
@@ -103,6 +105,51 @@ function buildCustomTarget(customBot: {
         customBotId: customBot.id,
         isActive: customBot.isActive,
     };
+}
+
+async function restoreConfiguredBuiltinBot(routeId: string) {
+    const definition = BUILTIN_BOT_MAP[routeId];
+    if (!definition) {
+        return null;
+    }
+
+    const sortOrder = Number(routeId);
+    const fallbackPrompt = definition.systemPromptFallback
+        || `你是${definition.name}，请给出专业、结构化、可执行的建议。`;
+    const systemPrompt = getSystemPromptBySortOrder(sortOrder, fallbackPrompt);
+
+    return prisma.bot.upsert({
+        where: { slug: definition.slug },
+        update: {
+            name: definition.name,
+            category: definition.category,
+            icon: definition.icon,
+            description: definition.description,
+            pointsPerUse: definition.pointsPerUse,
+            sortOrder,
+            isActive: true,
+        },
+        create: {
+            slug: definition.slug,
+            name: definition.name,
+            category: definition.category,
+            icon: definition.icon,
+            description: definition.description,
+            systemPrompt,
+            pointsPerUse: definition.pointsPerUse,
+            sortOrder,
+            isActive: true,
+        },
+        select: {
+            id: true,
+            name: true,
+            icon: true,
+            category: true,
+            pointsPerUse: true,
+            sortOrder: true,
+            isActive: true,
+        },
+    });
 }
 
 export function getConversationBotPayload(record: ConversationRecord): ConversationBotPayload {
@@ -209,6 +256,9 @@ export async function resolveConversationBotTarget(userId: string, routeBotId: s
                 isActive: true,
             },
         });
+        if (!builtinBot) {
+            builtinBot = await restoreConfiguredBuiltinBot(raw);
+        }
     } else if (UUID_RE.test(raw)) {
         builtinBot = await prisma.bot.findFirst({
             where: { id: raw, isActive: true },
