@@ -319,7 +319,7 @@ export default function HomePage() {
   const { user, isAuthenticated, isLoading, loadUser } = useAuthStore();
   const { conversations, favorites, loadConversations, toggleFavorite, removeFavorite, deleteConversation } = useConversationsStore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [trialBotsOpen, setTrialBotsOpen] = useState(false);
+  const [trialBotsOpen, setTrialBotsOpen] = useState(true);
   const [sidebarTab, setSidebarTab] = useState<'history' | 'favorites'>('history');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -527,8 +527,7 @@ export default function HomePage() {
     ])),
     [],
   );
-  const visibleHomepageBots = ALL_HOMEPAGE_BOTS.filter((bot) => !bot.isTrial);
-  const filteredBots = visibleHomepageBots.filter((bot) => {
+  const filteredBots = ALL_HOMEPAGE_BOTS.filter((bot) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return bot.name.toLowerCase().includes(q) || bot.description.toLowerCase().includes(q);
