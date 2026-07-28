@@ -303,6 +303,8 @@ const ALL_HOMEPAGE_BOTS: BotInfo[] = [
   ...VIDEO_WORKBENCH_TOOLS,
 ];
 
+const HIDDEN_HOMEPAGE_BOT_IDS = new Set(['image-generator', 'tiktok-studio']);
+
 const CATEGORY_ICONS: Record<string, ReactNode> = {
   '管理工具': <Compass size={18} />,
   '电商工具': <Package size={18} />,
@@ -527,11 +529,13 @@ export default function HomePage() {
     ])),
     [],
   );
-  const filteredBots = ALL_HOMEPAGE_BOTS.filter((bot) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return bot.name.toLowerCase().includes(q) || bot.description.toLowerCase().includes(q);
-  });
+  const filteredBots = ALL_HOMEPAGE_BOTS
+    .filter((bot) => !HIDDEN_HOMEPAGE_BOT_IDS.has(bot.id))
+    .filter((bot) => {
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase();
+      return bot.name.toLowerCase().includes(q) || bot.description.toLowerCase().includes(q);
+    });
 
   const buildBotGroups = (bots: BotInfo[]) => categories.map((cat) => ({
     category: cat,
