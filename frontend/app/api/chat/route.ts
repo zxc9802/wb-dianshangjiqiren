@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
-import { AppError } from '../../lib/auth';
-import { BUILTIN_BOT_MAP } from '../../lib/builtin-bots';
+import { errorResponse, getAuthUser } from '../../lib/auth';
+import { BUILTIN_BOT_MAP, GENERIC_CHAT_BOT_ID } from '../../lib/builtin-bots';
 import { buildPromptWithBuiltinKnowledge } from '../../lib/builtin-knowledge';
 import {
     DEFAULT_RESPONSE_MODEL,
@@ -17,6 +17,7 @@ import { streamYunwuGeminiChat } from '../../lib/yunwu-gemini-chat';
 import { streamYunwuClaudeChat } from '../../lib/yunwu-claude-chat';
 import { streamYunwuOpenAIChat, type OpenAIChatMessage } from '../../lib/yunwu-openai-chat';
 import { enrichSystemPromptWithWebSearch } from '../../lib/web-search';
+import { assertUserCanAccessOfficialBot } from '../../lib/server-bot-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -161,6 +162,7 @@ async function streamByResponseModel(
 
 export async function POST(req: NextRequest) {
     try {
+        const user = await getAuthUser(req);
         const body = await req.json() as {
             botId?: unknown;
             systemPrompt?: unknown;
@@ -173,6 +175,10 @@ export async function POST(req: NextRequest) {
         };
 
         const botIdString = String(body.botId ?? '').trim();
+        if (!botIdString.startsWith('custom-')) {
+            const accessBotKey = botIdString || GENERIC_CHAT_BOT_ID;
+            await assertUserCanAccessOfficialBot(user.id, accessBotKey, user.role);
+        }
         const responseModel = isResponseModel(body.responseModel) ? body.responseModel : DEFAULT_RESPONSE_MODEL;
         const webSearchMode = isWebSearchMode(body.webSearchMode) ? body.webSearchMode : DEFAULT_WEB_SEARCH_MODE;
         const normalizedMessages = normalizeMessages(body.messages, body.conversationHistory, body.message);
@@ -233,10 +239,6 @@ export async function POST(req: NextRequest) {
             },
         });
     } catch (error) {
-        const message = error instanceof AppError || error instanceof Error ? error.message : 'Unknown error';
-        return new Response(JSON.stringify({ error: message }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' },
-        });
+        return errorResponse(error);
     }
 }

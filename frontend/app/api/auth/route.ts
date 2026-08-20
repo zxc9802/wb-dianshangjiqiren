@@ -10,6 +10,8 @@ import {
     ensureAccessControlBootstrap,
     revokeAuthSession,
 } from '../../lib/auth';
+import { getUserBotAccessSummary } from '../../lib/server-bot-access';
+import { assertActiveRegistrationOptions } from '../../lib/server-registration-options';
 
 const accountSchema = z.string().trim().min(3, 'Account must be at least 3 characters.').max(64, 'Account is too long.');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters.');
@@ -91,7 +93,7 @@ function parseRequestBody<T>(schema: z.ZodSchema<T>, body: unknown): T {
     return result.data;
 }
 
-function toUserPayload(user: {
+type AuthPayloadUser = {
     id: string;
     email: string;
     nickname: string;
@@ -99,7 +101,11 @@ function toUserPayload(user: {
     avatar: string;
     role: string;
     createdAt?: Date;
-}) {
+};
+
+type AuthTokenUser = AuthPayloadUser & { authTokenVersion: number };
+
+async function toUserPayload(user: AuthPayloadUser) {
     return {
         id: user.id,
         account: user.email,
@@ -107,25 +113,17 @@ function toUserPayload(user: {
         groupName: user.groupName,
         avatar: user.avatar,
         role: user.role,
+        botAccess: await getUserBotAccessSummary(user.id, user.role),
         ...(user.createdAt ? { createdAt: user.createdAt } : {}),
     };
 }
 
-function issueAuthResponse(user: {
-    id: string;
-    email: string;
-    nickname: string;
-    groupName: string;
-    avatar: string;
-    role: string;
-    authTokenVersion: number;
-    createdAt?: Date;
-}, status = 200) {
+async function issueAuthResponse(user: AuthTokenUser, status = 200) {
     return Response.json({
         success: true,
         data: {
             token: signToken(user.id, user.authTokenVersion),
-            user: toUserPayload(user),
+            user: await toUserPayload(user),
         },
     }, { status });
 }
@@ -184,6 +182,7 @@ async function handleRegister(body: unknown) {
                     throw new AppError('Incorrect password.', 400);
                 }
 
+                await assertActiveRegistrationOptions(tx, nextNickname, nextGroupName);
                 await consumeInviteCode(tx, inviteCode, existing.id);
 
                 return tx.user.update({
@@ -209,6 +208,7 @@ async function handleRegister(body: unknown) {
             throw new AppError('Account already exists.', 409);
         }
 
+        await assertActiveRegistrationOptions(tx, nextNickname, nextGroupName);
         const passwordHash = await bcrypt.hash(data.password, 10);
         const createdUser = await tx.user.create({
             data: {
@@ -326,6 +326,7 @@ async function handleActivate(body: unknown) {
             throw new AppError('Group is required for activation.', 400, 'PROFILE_GROUP_REQUIRED');
         }
 
+        await assertActiveRegistrationOptions(tx, nextNickname, nextGroupName);
         await consumeInviteCode(tx, inviteCode, existing.id);
 
         return tx.user.update({

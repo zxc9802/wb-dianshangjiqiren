@@ -7,6 +7,7 @@ import { startPcm16kMonoRecorder, type Pcm16Recorder } from '../../lib/pcmRecord
 import { api, type AttachmentInfo, type ChatAttachmentPayload } from '../../lib/api';
 import { useAuthStore } from '../../stores/auth';
 import AdminBotPanel from '../../components/AdminBotPanel';
+import BotAccessGate from '../../components/BotAccessGate';
 import { BUILTIN_BOT_MAP, BUILTIN_BOT_NAME_MAP, GENERIC_CHAT_BOT_ID, VIDEO_BREAKDOWN_BOT_ID } from '../../lib/builtin-bots';
 import { normalizeUpstreamErrorMessage } from '../../lib/upstream-error';
 import {
@@ -1047,6 +1048,13 @@ function chooseReferencedConversationVideos(params: {
 }
 
 export default function ChatPage() {
+    const params = useParams();
+    const botId = params.id as string;
+    if (botId.startsWith('custom-')) return <ChatPageContent />;
+    return <BotAccessGate botKey={botId}><ChatPageContent /></BotAccessGate>;
+}
+
+function ChatPageContent() {
     const params = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();

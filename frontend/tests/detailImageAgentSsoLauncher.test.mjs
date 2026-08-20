@@ -123,6 +123,9 @@ test('detail image agent API routes use the dedicated SSO helpers', async () => 
   assert.match(startRoute, /buildDetailImageAgentSsoUrl/)
   assert.match(exchangeRoute, /consumeDetailImageAgentSsoTicket/)
   assert.match(exchangeRoute, /signToken/)
+  assert.match(startRoute, /assertUserCanAccessOfficialBot\(user\.id, 'detail-image-agent'/)
+  const postRoute = startRoute.slice(startRoute.indexOf('export async function POST'))
+  assert.ok(postRoute.indexOf('assertUserCanAccessOfficialBot') < postRoute.indexOf('createDetailImageAgentSsoTicket('))
 })
 
 test('detail image agent launcher delegates to its client component', async () => {

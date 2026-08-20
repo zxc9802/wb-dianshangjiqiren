@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { AppError } from './auth';
 import { BUILTIN_BOT_MAP } from './builtin-bots';
 import { prisma } from './prisma';
+import { assertUserCanAccessOfficialBot } from './server-bot-access';
 import { getSystemPromptBySortOrder } from './systemPrompts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -243,7 +244,13 @@ export async function resolveConversationBotTarget(userId: string, routeBotId: s
         isActive: boolean;
     } | null = null;
 
+    let accessChecked = false;
     if (/^\d+$/.test(raw)) {
+        if (!BUILTIN_BOT_MAP[raw]) {
+            throw new AppError('Bot not found', 404);
+        }
+        await assertUserCanAccessOfficialBot(userId, raw);
+        accessChecked = true;
         builtinBot = await prisma.bot.findFirst({
             where: { sortOrder: Number(raw), isActive: true },
             select: {
@@ -276,6 +283,10 @@ export async function resolveConversationBotTarget(userId: string, routeBotId: s
 
     if (!builtinBot) {
         throw new AppError('Bot not found', 404);
+    }
+
+    if (!accessChecked) {
+        await assertUserCanAccessOfficialBot(userId, String(builtinBot.sortOrder));
     }
 
     return buildBuiltinTarget(builtinBot);

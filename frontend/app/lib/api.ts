@@ -1,4 +1,6 @@
 import type { ResponseModel, WebSearchMode } from './chat-models';
+import type { BotAccessSummary } from './bot-access';
+import type { OfficialBotCatalogEntry } from './bot-access-catalog';
 
 const API_BASE = '/api';
 export type VideoSiteKey = 'seedance' | 'tiktok';
@@ -113,6 +115,9 @@ async function request<T>(
 
 export const api = {
     // Auth
+    getRegistrationOptions: () =>
+        request<{ success: boolean; data: RegistrationOptionsInfo }>('/registration-options'),
+
     register: (body: { account: string; password: string; nickname: string; groupName: string; inviteCode: string }) =>
         request<{ success: boolean; data: { token: string; user: UserInfo } }>('/auth?action=register', { method: 'POST', body: JSON.stringify(body) }),
 
@@ -126,6 +131,39 @@ export const api = {
 
     updateProfile: (body: { nickname: string }) =>
         request<{ success: boolean; data: UserInfo }>('/auth/me', { method: 'PATCH', body: JSON.stringify(body) }),
+
+    // Admin member directory
+    getAdminRegistrationOptions: () =>
+        request<{ success: boolean; data: AdminRegistrationOptionInfo[] }>('/admin/registration-options'),
+
+    createAdminRegistrationOption: (body: { kind: 'name' | 'group'; label: string }) =>
+        request<{ success: boolean; data: AdminRegistrationOptionInfo }>('/admin/registration-options', {
+            method: 'POST',
+            body: JSON.stringify(body),
+        }),
+
+    updateAdminRegistrationOption: (id: string, body: { isActive: boolean }) =>
+        request<{ success: boolean; data: AdminRegistrationOptionInfo }>(`/admin/registration-options/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(body),
+        }),
+
+    getAdminMembers: () =>
+        request<{ success: boolean; data: AdminMemberInfo[] }>('/admin/members'),
+
+    replaceAdminMemberBotAccess: (id: string, botKeys: string[]) =>
+        request<{ success: boolean; data: BotAccessSummary }>(`/admin/members/${id}/bot-access`, {
+            method: 'PUT',
+            body: JSON.stringify({ botKeys }),
+        }),
+
+    resetAdminMemberBotAccess: (id: string) =>
+        request<{ success: boolean; data: BotAccessSummary }>(`/admin/members/${id}/bot-access`, {
+            method: 'DELETE',
+        }),
+
+    getAdminBotCatalog: () =>
+        request<{ success: boolean; data: OfficialBotCatalogEntry[] }>('/admin/bot-catalog'),
 
     // Admin invite codes
     createInviteCodeBatch: (body: { count: number }) =>
@@ -358,7 +396,30 @@ export interface UserInfo {
     groupName: string;
     avatar: string;
     role: UserRole;
+    botAccess: BotAccessSummary;
     createdAt?: string;
+}
+
+export interface RegistrationOptionsInfo {
+    names: string[];
+    groups: string[];
+}
+
+export interface AdminRegistrationOptionInfo {
+    id: string;
+    kind: 'name' | 'group';
+    label: string;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface AdminMemberInfo {
+    id: string;
+    account: string;
+    nickname: string;
+    groupName: string;
+    botAccess: BotAccessSummary;
 }
 
 export type UserRole = 'admin' | 'member';

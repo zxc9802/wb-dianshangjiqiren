@@ -14,6 +14,7 @@ const launcherPath = path.join(appRoot, 'bot', 'tiktok-studio', 'page.tsx')
 const clientPath = path.join(appRoot, 'bot', 'video-workbench', 'VideoWorkbenchClient.tsx')
 const homePagePath = path.join(appRoot, 'page.tsx')
 const videoSsoPath = path.join(appRoot, 'lib', 'video-sso.ts')
+const videoStartRoutePath = path.join(appRoot, 'api', 'video-sso', 'start', 'route.ts')
 const apiModulePath = path.join(appRoot, 'lib', 'api.ts')
 const nodeRequire = createRequire(import.meta.url)
 
@@ -169,6 +170,13 @@ test('tiktok video SSO uses the tiktok default host instead of legacy seedance e
 
   assert.equal(getVideoAppUrl('seedance'), 'https://seedance-env.example.test')
   assert.equal(getVideoAppUrl('tiktok'), 'https://titok.qyaijingxuan.top')
+})
+
+test('video SSO checks the site-specific bot before creating a ticket', async () => {
+  const source = await readFile(videoStartRoutePath, 'utf8')
+  assert.match(source, /site === 'tiktok' \? 'tiktok-studio' : 'video-workbench'/)
+  const postRoute = source.slice(source.indexOf('export async function POST'))
+  assert.ok(postRoute.indexOf('assertUserCanAccessOfficialBot') < postRoute.indexOf('createVideoSsoTicket('))
 })
 
 test('startVideoSso does not force a bare login redirect on 401', async () => {

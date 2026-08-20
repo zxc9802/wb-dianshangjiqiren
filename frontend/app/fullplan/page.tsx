@@ -137,7 +137,10 @@ export default function FullPlanPage() {
 
                 const response = await fetch('/api/chat', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
+                    },
                     body: JSON.stringify({
                         message: prompt,
                         systemPrompt: '你是电商全案策划顾问，请直接输出结构化、可执行的结果。',

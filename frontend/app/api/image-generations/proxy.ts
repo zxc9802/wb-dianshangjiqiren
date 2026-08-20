@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server';
+import { AppError, AuthError, errorResponse, getAuthUser } from '../../lib/auth';
 import { readBackendUrl } from '../../lib/server-env';
+import { assertUserCanAccessOfficialBot } from '../../lib/server-bot-access';
 
 const BACKEND_IMAGE_API_PREFIX = '/api/image-assets/';
 const LEGACY_FRONTEND_IMAGE_PREFIX = '/generated-images/';
@@ -232,6 +234,8 @@ export async function generateImageViaBackend(sourceHeaders: Headers, body: Reco
 
 export async function proxyGenerateImageRequest(req: NextRequest): Promise<Response> {
     try {
+        const user = await getAuthUser(req);
+        await assertUserCanAccessOfficialBot(user.id, 'image-generator', user.role);
         const body = await req.json() as Record<string, unknown>;
         const upstream = await requestBackendImageGeneration(req.headers, body);
         return Response.json(upstream.payload, {
@@ -239,6 +243,9 @@ export async function proxyGenerateImageRequest(req: NextRequest): Promise<Respo
             statusText: upstream.statusText,
         });
     } catch (error) {
+        if (error instanceof AuthError || error instanceof AppError) {
+            return errorResponse(error);
+        }
         const message = error instanceof Error ? error.message : 'Image generation request failed';
         return Response.json({ success: false, message }, { status: 502 });
     }

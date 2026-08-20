@@ -1,9 +1,9 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Bot } from 'lucide-react';
-import { ApiError } from '../lib/api';
+import { api, ApiError, type RegistrationOptionsInfo } from '../lib/api';
 import { useAuthStore } from '../stores/auth';
 import styles from './login.module.css';
 
@@ -34,12 +34,37 @@ function LoginPageContent() {
     const [inviteCode, setInviteCode] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [optionsLoading, setOptionsLoading] = useState(false);
+    const [registrationOptions, setRegistrationOptions] = useState<RegistrationOptionsInfo>({ names: [], groups: [] });
 
     const router = useRouter();
     const searchParams = useSearchParams();
     const { login, register } = useAuthStore();
     const redirectTarget = searchParams.get('redirect') || '/';
     const isRegister = mode === 'register';
+    const registrationBlocked = registrationOptions.names.length === 0 || registrationOptions.groups.length === 0;
+
+    const loadRegistrationOptions = useCallback(async () => {
+        setOptionsLoading(true);
+        try {
+            const response = await api.getRegistrationOptions();
+            const nextOptions = response.data;
+            setRegistrationOptions(nextOptions);
+            setNickname((current) => nextOptions.names.includes(current) ? current : '');
+            setGroupName((current) => nextOptions.groups.includes(current) ? current : '');
+        } catch (err) {
+            setRegistrationOptions({ names: [], groups: [] });
+            setError(err instanceof Error ? err.message : '无法加载注册选项，请稍后重试。');
+        } finally {
+            setOptionsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (mode === 'register') {
+            void loadRegistrationOptions();
+        }
+    }, [loadRegistrationOptions, mode]);
 
     const setModeAndResetError = (nextMode: AuthMode) => {
         setMode(nextMode);
@@ -84,6 +109,11 @@ function LoginPageContent() {
                 } else if (err.code === 'PROFILE_GROUP_REQUIRED') {
                     setMode('register');
                     setError('注册时必须填写组别。');
+                } else if (err.code === 'REGISTRATION_OPTION_INVALID') {
+                    setNickname('');
+                    setGroupName('');
+                    await loadRegistrationOptions();
+                    setError(err.message);
                 } else {
                     setError(err.message);
                 }
@@ -149,32 +179,40 @@ function LoginPageContent() {
                             <>
                                 <div className={styles.field}>
                                     <label className={styles.label}>姓名</label>
-                                    <input
-                                        type="text"
+                                    <select
                                         value={nickname}
                                         onChange={(event) => {
                                             setNickname(event.target.value);
                                             if (error) setError('');
                                         }}
-                                        placeholder="请输入姓名"
                                         required
                                         className={styles.input}
-                                    />
+                                        disabled={optionsLoading}
+                                    >
+                                        <option value="" disabled>请选择姓名</option>
+                                        {registrationOptions.names.map((name) => (
+                                            <option key={name} value={name}>{name}</option>
+                                        ))}
+                                    </select>
                                 </div>
 
                                 <div className={styles.field}>
                                     <label className={styles.label}>组别</label>
-                                    <input
-                                        type="text"
+                                    <select
                                         value={groupName}
                                         onChange={(event) => {
                                             setGroupName(event.target.value);
                                             if (error) setError('');
                                         }}
-                                        placeholder="请输入组别"
                                         required
                                         className={styles.input}
-                                    />
+                                        disabled={optionsLoading}
+                                    >
+                                        <option value="" disabled>请选择组别</option>
+                                        {registrationOptions.groups.map((group) => (
+                                            <option key={group} value={group}>{group}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </>
                         ) : null}
@@ -213,13 +251,19 @@ function LoginPageContent() {
 
                         {isRegister ? (
                             <p className={styles.switchHint}>
-                                邀请码为一次性凭证。注册时请填写邀请码、姓名与组别。
+                                {registrationBlocked && !optionsLoading
+                                    ? '请联系管理员添加可用的姓名和组别后再注册。'
+                                    : '邀请码为一次性凭证。注册时请选择姓名与组别。'}
                             </p>
                         ) : null}
 
                         {error ? <p className={styles.error}>{error}</p> : null}
 
-                        <button type="submit" className={styles.submitBtn} disabled={loading}>
+                        <button
+                            type="submit"
+                            className={styles.submitBtn}
+                            disabled={loading || (isRegister && (optionsLoading || registrationBlocked))}
+                        >
                             {loading ? '提交中...' : mode === 'login' ? '登录' : '注册并进入'}
                         </button>
 

@@ -36,6 +36,7 @@ model User {
   usedInviteCodes          InviteCode[]        @relation("InviteCodeConsumer")
   videoSsoTickets          VideoSsoTicket[]
   videoUploadJobs          VideoUploadJob[]
+  botAccessPolicy          UserBotAccessPolicy?
 
   @@map("users")
 }
@@ -500,4 +501,42 @@ model SystemSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("system_settings")
+}
+
+model RegistrationOption {
+  id        String   @id @default(uuid())
+  kind      String
+  label     String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([kind, label])
+  @@index([kind, isActive, label])
+  @@map("registration_options")
+}
+
+model UserBotAccessPolicy {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions UserBotPermission[]
+
+  @@map("user_bot_access_policies")
+}
+
+model UserBotPermission {
+  id        String   @id @default(uuid())
+  policyId  String   @map("policy_id")
+  botKey    String   @map("bot_key")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  policy UserBotAccessPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, botKey])
+  @@index([botKey])
+  @@map("user_bot_permissions")
 }

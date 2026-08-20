@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getAuthUser, errorResponse } from '@/app/lib/auth';
+import { assertUserCanAccessOfficialBot } from '@/app/lib/server-bot-access';
 import {
     buildCopywritingAgentSsoUrl,
     createCopywritingAgentSsoTicket,
@@ -17,6 +18,7 @@ async function readRequestBody(req: NextRequest): Promise<unknown> {
 export async function POST(req: NextRequest) {
     try {
         const user = await getAuthUser(req);
+        await assertUserCanAccessOfficialBot(user.id, 'copywriting-agent', user.role);
         const body = await readRequestBody(req) as { redirectPath?: unknown };
         const ticket = await createCopywritingAgentSsoTicket(
             user.id,

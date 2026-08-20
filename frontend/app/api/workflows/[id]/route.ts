@@ -3,6 +3,8 @@ import { prisma } from '../../../lib/prisma';
 import { getUserId, AppError, errorResponse } from '../../../lib/auth';
 import { executeWorkflow } from '../../../lib/workflow-executor';
 import { randomBytes } from 'crypto';
+import { assertUserCanAccessOfficialBot } from '../../../lib/server-bot-access';
+import { deserializeSimpleWorkflow } from '../../../lib/workflow-simple';
 
 function serializeWorkflow(workflow: {
     id: string;
@@ -113,6 +115,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         if (!wf) throw new AppError('工作流不存在', 404);
 
         if (action === 'run') {
+            const officialBotKeys = [...new Set(deserializeSimpleWorkflow(wf.canvasData)
+                .map((step) => step.botId)
+                .filter((botId) => !botId.startsWith('custom-')))];
+            for (const botKey of officialBotKeys) {
+                await assertUserCanAccessOfficialBot(userId, botKey);
+            }
             const body = await req.json();
             const execution = await prisma.workflowExecution.create({
                 data: { workflowId: wf.id, userId, input: body.input ? JSON.stringify(body.input) : null },

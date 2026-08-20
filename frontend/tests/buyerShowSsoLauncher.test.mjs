@@ -42,6 +42,9 @@ test('buyer-show SSO API routes use dedicated helpers', async () => {
   assert.match(startRoute, /buildBuyerShowSsoUrl/)
   assert.match(exchangeRoute, /consumeBuyerShowSsoTicket/)
   assert.match(exchangeRoute, /signToken/)
+  assert.match(startRoute, /assertUserCanAccessOfficialBot\(user\.id, 'buyer-show'/)
+  const postRoute = startRoute.slice(startRoute.indexOf('export async function POST'))
+  assert.ok(postRoute.indexOf('assertUserCanAccessOfficialBot') < postRoute.indexOf('createBuyerShowSsoTicket('))
 })
 
 test('buyer-show launcher delegates to its client component', async () => {

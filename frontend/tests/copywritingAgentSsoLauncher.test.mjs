@@ -123,6 +123,9 @@ test('copywriting agent API routes use the dedicated SSO helpers', async () => {
   assert.match(startRoute, /buildCopywritingAgentSsoUrl/)
   assert.match(exchangeRoute, /consumeCopywritingAgentSsoTicket/)
   assert.match(exchangeRoute, /signToken/)
+  assert.match(startRoute, /assertUserCanAccessOfficialBot\(user\.id, 'copywriting-agent'/)
+  const postRoute = startRoute.slice(startRoute.indexOf('export async function POST'))
+  assert.ok(postRoute.indexOf('assertUserCanAccessOfficialBot') < postRoute.indexOf('createCopywritingAgentSsoTicket('))
 })
 
 test('copywriting agent launcher delegates to its client component', async () => {

@@ -9,13 +9,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const sourcePath = path.join(__dirname, '..', 'app', 'lib', 'server-conversations.ts')
 
 class TestAppError extends Error {
-  constructor(message, status = 400) {
+  constructor(message, status = 400, code) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
-async function loadServerConversations(prisma) {
+async function loadServerConversations(prisma, allowedBotKeys = ['1']) {
   const source = await readFile(sourcePath, 'utf8')
   const compiled = ts.transpileModule(source, {
     compilerOptions: {
@@ -29,6 +30,15 @@ async function loadServerConversations(prisma) {
     if (specifier === '@prisma/client') return { Prisma: {} }
     if (specifier === './auth') return { AppError: TestAppError }
     if (specifier === './prisma') return { prisma }
+    if (specifier === './server-bot-access') {
+      return {
+        assertUserCanAccessOfficialBot: async (_userId, botKey) => {
+          if (!allowedBotKeys.includes(botKey)) {
+            throw new TestAppError('Denied', 403, 'BOT_ACCESS_DENIED')
+          }
+        },
+      }
+    }
     if (specifier === './builtin-bots') {
       return {
         BUILTIN_BOT_MAP: {
@@ -133,4 +143,27 @@ test('unknown numeric bot routes still return Bot not found', async () => {
     (error) => error instanceof TestAppError && error.message === 'Bot not found' && error.status === 404,
   )
   assert.equal(upsertCount, 0)
+})
+
+test('restricted builtin bot is denied before restore or conversation creation', async () => {
+  const calls = { botReads: 0, botWrites: 0 }
+  const prisma = {
+    bot: {
+      findFirst: async () => {
+        calls.botReads += 1
+        return null
+      },
+      upsert: async () => {
+        calls.botWrites += 1
+        return null
+      },
+    },
+  }
+  const { resolveConversationBotTarget } = await loadServerConversations(prisma, ['2'])
+  await assert.rejects(
+    () => resolveConversationBotTarget('user-1', '1'),
+    (error) => error.status === 403 && error.code === 'BOT_ACCESS_DENIED',
+  )
+  assert.equal(calls.botReads, 0)
+  assert.equal(calls.botWrites, 0)
 })

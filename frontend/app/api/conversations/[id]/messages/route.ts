@@ -33,6 +33,7 @@ import {
 import { streamGeminiDeepThinkingChat } from '../../../../lib/gemini-deep-chat';
 import { getSystemPromptBySortOrder, isPlaceholderPrompt } from '../../../../lib/systemPrompts';
 import { buildConversationTitle, getConversationBotPayload } from '../../../../lib/server-conversations';
+import { assertConversationBotAccess } from '../../../../lib/server-bot-access';
 import { deleteTempVideo, downloadRemoteVideo, loadTempVideo } from '../../../../lib/server-chat-video';
 import { buildLongTermMemoryPrompt, rememberConversationTurn } from '../../../../lib/server-memory';
 import {
@@ -558,6 +559,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     try {
         const userId = await getUserId(req);
         const { id: conversationId } = await params;
+        const conversation = await prisma.conversation.findFirst({
+            where: { id: conversationId, userId },
+            include: {
+                bot: true,
+                customBot: {
+                    include: {
+                        documents: {
+                            select: { fileName: true, parsedText: true },
+                            orderBy: { createdAt: 'asc' },
+                        },
+                    },
+                },
+            },
+        });
+
+        if (!conversation) {
+            throw new AppError('Conversation not found', 404);
+        }
+
+        const bot = getConversationBotPayload(conversation);
+        await assertConversationBotAccess(userId, bot);
         const {
             content,
             displayContent,
@@ -632,26 +654,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             throw new AppError('Image generation requests do not accept uploaded attachments.', 400);
         }
 
-        const conversation = await prisma.conversation.findFirst({
-            where: { id: conversationId, userId },
-            include: {
-                bot: true,
-                customBot: {
-                    include: {
-                        documents: {
-                            select: { fileName: true, parsedText: true },
-                            orderBy: { createdAt: 'asc' },
-                        },
-                    },
-                },
-            },
-        });
-
-        if (!conversation) {
-            throw new AppError('Conversation not found', 404);
-        }
-
-        const bot = getConversationBotPayload(conversation);
         const isVideoBreakdownBot = bot.kind === 'builtin'
             && bot.routeId === VIDEO_BREAKDOWN_BOT_ID;
         const needsFullHistory = inputType === 'image' || isVideoBreakdownBot;

@@ -28,6 +28,8 @@ import { putLaunchChatDraft } from './lib/launch-chat-drafts';
 import { VIDEO_SITE_METADATA, type VideoSiteKey } from './lib/video-sites';
 import { startPcm16kMonoRecorder, type Pcm16Recorder } from './lib/pcmRecorder';
 import { api } from './lib/api';
+import { canAccessOfficialBot, findDeniedBotKeys } from './lib/bot-access';
+import { getOfficialBot } from './lib/bot-access-catalog';
 import styles from './page.module.css';
 import {
   Bot, Search, Sun, Moon, Home, Zap, ImageIcon, User, Trash2,
@@ -514,6 +516,12 @@ export default function HomePage() {
 
   const launchWorkflow = (tpl: typeof WF_TEMPLATES[0]) => {
     if (!isAuthenticated) { router.push('/login'); return; }
+    const deniedBotKeys = findDeniedBotKeys(user?.botAccess, tpl.steps.map((step) => step.botId));
+    if (deniedBotKeys.length > 0) {
+      const deniedNames = deniedBotKeys.map((botKey) => getOfficialBot(botKey)?.name || botKey);
+      alert(`当前账号没有以下智能体权限：${deniedNames.join('、')}`);
+      return;
+    }
     const state = {
       workflowId: tpl.id,
       workflowName: tpl.name,
@@ -537,6 +545,7 @@ export default function HomePage() {
   const filteredBots = ALL_HOMEPAGE_BOTS
     .filter((bot) => !HIDDEN_HOMEPAGE_BOT_IDS.has(bot.id))
     .filter((bot) => {
+      if (!canAccessOfficialBot(user?.botAccess, bot.id)) return false;
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase();
       return bot.name.toLowerCase().includes(q) || bot.description.toLowerCase().includes(q);
@@ -612,6 +621,7 @@ export default function HomePage() {
     </div>
   );
 
+  const canUseGenericChat = canAccessOfficialBot(user?.botAccess, GENERIC_CHAT_BOT_ID);
   const canSubmitGeneralChat = generalPrompt.trim().length > 0 || generalAttachedFiles.length > 0;
 
   if (isLoading) return <div className={styles.loading}><div className={styles.spinner} /></div>;
@@ -641,7 +651,10 @@ export default function HomePage() {
           <button onClick={() => requireAuth('/my-bots')} className={styles.navBtn}>我的智能体</button>
           <button onClick={() => requireAuth('/my-workflows')} className={styles.navBtn}>我的工作流</button>
           {user?.role === 'admin' && (
-            <button onClick={() => requireAuth('/admin/invite-codes')} className={styles.navBtn}>邀请码管理</button>
+            <>
+              <button onClick={() => requireAuth('/admin')} className={styles.navBtn}>管理员后台</button>
+              <button onClick={() => requireAuth('/admin/invite-codes')} className={styles.navBtn}>邀请码管理</button>
+            </>
           )}
           <button onClick={() => requireAuth('/insights')} className={styles.navBtn}>网页洞察</button>
           {mounted && (
@@ -732,7 +745,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <section className={styles.generalComposerSection}>
+          {canUseGenericChat ? <section className={styles.generalComposerSection}>
             <div className={styles.heroGreeting}>
               <h2 className={styles.heroGreetingTitle}>
                 {isAuthenticated && user?.nickname
@@ -879,7 +892,13 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-          </section>
+          </section> : (
+            <section className={styles.generalComposerSection}>
+              <div className={styles.generalComposerCard}>
+                <p>管理员暂未向当前账号开放通用聊天。</p>
+              </div>
+            </section>
+          )}
 
           {formalBotGroups.map((group) => (
             <div key={group.category} className={styles.categorySection}>

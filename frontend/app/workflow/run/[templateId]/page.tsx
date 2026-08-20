@@ -62,7 +62,10 @@ export default function WorkflowReportPage({ params }: { params: Promise<{ templ
         try {
             const res = await fetch('/api/chat', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
+                },
                 body: JSON.stringify({
                     botId: '6',
                     systemPrompt: '你是专业的商业报告撰写专家，请把多步骤分析结果整合成结构清晰、可执行的工作报告。',

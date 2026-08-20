@@ -9,6 +9,9 @@ import {
 import { api, type WorkflowInfo } from '../lib/api';
 import { BUILTIN_BOT_MAP, BUILTIN_BOTS } from '../lib/builtin-bots';
 import { deserializeSimpleWorkflow, serializeSimpleWorkflow, type SimpleWorkflowStep } from '../lib/workflow-simple';
+import { canAccessOfficialBot, findDeniedBotKeys } from '../lib/bot-access';
+import { getOfficialBot } from '../lib/bot-access-catalog';
+import { useAuthStore } from '../stores/auth';
 import styles from './myworkflows.module.css';
 
 const BUILTIN_BOT_OPTIONS: Array<{ id: string; name: string }> = BUILTIN_BOTS.map((bot) => ({
@@ -56,6 +59,7 @@ function normalizeWorkflow(workflow: WorkflowInfo): WorkflowItem {
 
 export default function MyWorkflowsPage() {
   const router = useRouter();
+  const { user, loadUser } = useAuthStore();
   const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
   const [customBots, setCustomBots] = useState<Array<{ id: string; name: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -99,11 +103,15 @@ export default function MyWorkflowsPage() {
   }, []);
 
   useEffect(() => {
+    void loadUser();
     void loadWorkflows();
     void loadCustomBots();
-  }, [loadCustomBots, loadWorkflows]);
+  }, [loadCustomBots, loadUser, loadWorkflows]);
 
-  const allBotOptions = useMemo(() => [...BUILTIN_BOT_OPTIONS, ...customBots], [customBots]);
+  const allBotOptions = useMemo(() => [
+    ...BUILTIN_BOT_OPTIONS.filter((bot) => canAccessOfficialBot(user?.botAccess, bot.id)),
+    ...customBots,
+  ], [customBots, user?.botAccess]);
 
   const resetForm = () => {
     setName('');
@@ -204,6 +212,15 @@ export default function MyWorkflowsPage() {
   };
 
   const launchWorkflow = (workflow: WorkflowItem) => {
+    const deniedBotKeys = findDeniedBotKeys(
+      user?.botAccess,
+      workflow.steps.filter((step) => !step.botId.startsWith('custom-')).map((step) => step.botId),
+    );
+    if (deniedBotKeys.length > 0) {
+      const deniedNames = deniedBotKeys.map((botKey) => getOfficialBot(botKey)?.name || botKey);
+      alert(`当前账号没有以下智能体权限：${deniedNames.join('、')}`);
+      return;
+    }
     sessionStorage.setItem('wf_state', JSON.stringify({
       workflowId: workflow.id,
       workflowName: workflow.name,
