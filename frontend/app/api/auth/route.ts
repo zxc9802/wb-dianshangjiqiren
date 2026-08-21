@@ -255,6 +255,7 @@ async function handleLogin(body: unknown) {
             avatar: true,
             role: true,
             accessGrantedAt: true,
+            isActive: true,
             authTokenVersion: true,
             createdAt: true,
         },
@@ -267,6 +268,10 @@ async function handleLogin(body: unknown) {
     const valid = await bcrypt.compare(data.password, user.passwordHash);
     if (!valid) {
         throw new AppError('Incorrect password.', 400);
+    }
+
+    if (user.role !== 'admin' && user.isActive === false) {
+        throw new AppError('该账号已停用。', 403, 'ACCOUNT_DISABLED');
     }
 
     if (user.role !== 'admin' && !user.accessGrantedAt) {
@@ -293,6 +298,7 @@ async function handleActivate(body: unknown) {
                 avatar: true,
                 role: true,
                 accessGrantedAt: true,
+                isActive: true,
                 authTokenVersion: true,
                 createdAt: true,
             },
@@ -309,6 +315,10 @@ async function handleActivate(body: unknown) {
 
         if (existing.role === 'admin') {
             return existing;
+        }
+
+        if (existing.isActive === false) {
+            throw new AppError('该账号已停用。', 403, 'ACCOUNT_DISABLED');
         }
 
         if (existing.accessGrantedAt) {

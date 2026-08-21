@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { AppError } from './auth';
+import { AppError, assertMemberAccountEnabled } from './auth';
 import { prisma } from './prisma';
 import { readServerEnv } from './server-env';
 import { KB_CHAT_SITE_METADATA } from './kb-chat-site';
@@ -125,6 +125,7 @@ export async function consumeKbChatSsoTicket(ticketId: string) {
                 groupName: true,
                 role: true,
                 accessGrantedAt: true,
+                isActive: true,
                 authTokenVersion: true,
                 kbChatRolePolicy: {
                     select: {
@@ -141,6 +142,7 @@ export async function consumeKbChatSsoTicket(ticketId: string) {
             throw new AppError('Account not found.', 404);
         }
 
+        assertMemberAccountEnabled(user);
         const hasAccess = user.role === 'admin' || Boolean(user.accessGrantedAt);
         if (!hasAccess) {
             throw new AppError('Invite code required.', 403, 'INVITE_REQUIRED');

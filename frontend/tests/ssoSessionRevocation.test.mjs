@@ -68,10 +68,12 @@ test('auth tokens carry a server-side session version and stale tokens are rejec
   const authLib = await readFile(authLibPath, 'utf8')
 
   assert.match(schema, /authTokenVersion\s+Int\s+@default\(0\)\s+@map\("auth_token_version"\)/)
+  assert.match(schema, /isActive\s+Boolean\s+@default\(true\)\s+@map\("is_active"\)/)
   assert.match(authLib, /tokenVersion:\s*authTokenVersion/)
   assert.match(authLib, /authTokenVersion:\s*true/)
   assert.match(authLib, /decoded\.tokenVersion !== user\.authTokenVersion/)
   assert.match(authLib, /SESSION_REVOKED/)
+  assert.match(authLib, /ACCOUNT_DISABLED/)
 })
 
 test('main-site logout invalidates existing SSO child-site tokens on the server', async () => {

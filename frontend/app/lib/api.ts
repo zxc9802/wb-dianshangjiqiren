@@ -157,6 +157,17 @@ export const api = {
     getAdminMembers: () =>
         request<{ success: boolean; data: AdminMemberInfo[] }>('/admin/members'),
 
+    updateAdminMember: (id: string, body: { isActive: boolean }) =>
+        request<{ success: boolean; data: { isActive: boolean } }>(`/admin/members/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(body),
+        }),
+
+    deleteAdminMember: (id: string) =>
+        request<{ success: boolean }>(`/admin/members/${id}`, {
+            method: 'DELETE',
+        }),
+
     replaceAdminMemberBotAccess: (id: string, botKeys: string[]) =>
         request<{ success: boolean; data: BotAccessSummary }>(`/admin/members/${id}/bot-access`, {
             method: 'PUT',
@@ -436,6 +447,7 @@ export interface AdminMemberInfo {
     account: string;
     nickname: string;
     groupName: string;
+    isActive: boolean;
     botAccess: BotAccessSummary;
     kbChatRoles: KbChatRoleAccessSummary;
 }

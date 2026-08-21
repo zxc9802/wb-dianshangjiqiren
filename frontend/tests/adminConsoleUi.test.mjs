@@ -41,3 +41,14 @@ test('permission editor pins account and name above categorized bot checkboxes',
   assert.match(page, /保存权限/)
   assert.match(page, /恢复默认全部/)
 })
+
+test('deleted or deactivated accounts cannot be permission-edited', async () => {
+  const page = await readFile(adminPagePath, 'utf8')
+  assert.match(page, /updateAdminMember/)
+  assert.match(page, /deleteAdminMember/)
+  assert.match(page, /停用账号/)
+  assert.match(page, /删除账号/)
+  assert.match(page, /showDisabledMembers \|\| member\.isActive !== false/)
+  assert.match(page, /canEditSelectedMember/)
+  assert.match(page, /该账号已停用，无法设置权限/)
+})

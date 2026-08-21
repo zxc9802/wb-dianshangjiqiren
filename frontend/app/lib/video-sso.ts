@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { AppError } from './auth';
+import { AppError, assertMemberAccountEnabled, ensureAccessControlBootstrap } from './auth';
 import { prisma } from './prisma';
 import { readServerEnv } from './server-env';
 import { VIDEO_SITE_KEYS, VIDEO_SITE_METADATA, type VideoSiteKey } from './video-sites';
@@ -64,6 +64,7 @@ async function runEnsureVideoSsoTicketTable(): Promise<void> {
 }
 
 export async function ensureVideoSsoTicketTable(): Promise<void> {
+    await ensureAccessControlBootstrap();
     if (!ensureVideoSsoTicketTablePromise) {
         ensureVideoSsoTicketTablePromise = runEnsureVideoSsoTicketTable().catch((error) => {
             ensureVideoSsoTicketTablePromise = null;
@@ -204,6 +205,7 @@ export async function consumeVideoSsoTicket(ticketId: string) {
                 groupName: true,
                 role: true,
                 accessGrantedAt: true,
+                isActive: true,
                 authTokenVersion: true,
             },
         });
@@ -212,6 +214,7 @@ export async function consumeVideoSsoTicket(ticketId: string) {
             throw new AppError('Account not found.', 404);
         }
 
+        assertMemberAccountEnabled(user);
         const hasAccess = user.role === 'admin' || Boolean(user.accessGrantedAt);
         if (!hasAccess) {
             throw new AppError('Invite code required.', 403, 'INVITE_REQUIRED');

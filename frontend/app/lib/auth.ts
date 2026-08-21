@@ -89,6 +89,10 @@ async function ensureAuthTokenVersionColumn(): Promise<void> {
         ALTER TABLE users
         ADD COLUMN IF NOT EXISTS auth_token_version integer NOT NULL DEFAULT 0
     `);
+    await prisma.$executeRawUnsafe(`
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true
+    `);
 }
 
 async function syncAdminAccount(
@@ -151,9 +155,19 @@ async function loadUserById(userId: string) {
             createdAt: true,
             role: true,
             accessGrantedAt: true,
+            isActive: true,
             authTokenVersion: true,
         },
     });
+}
+
+export function assertMemberAccountEnabled(user: {
+    role: string;
+    isActive?: boolean | null;
+}): void {
+    if (user.role !== 'admin' && user.isActive === false) {
+        throw new AppError('该账号已停用。', 403, 'ACCOUNT_DISABLED');
+    }
 }
 
 export async function getAuthUser(req: NextRequest, options: AuthOptions = {}): Promise<NonNullable<AuthUser>> {
@@ -180,6 +194,8 @@ export async function getAuthUser(req: NextRequest, options: AuthOptions = {}): 
     if (options.requireAdmin && user.role !== 'admin') {
         throw new AuthError('Admin access required.', 403, 'FORBIDDEN_ADMIN_ONLY');
     }
+
+    assertMemberAccountEnabled(user);
 
     const hasAccess = user.role === 'admin' || Boolean(user.accessGrantedAt);
     if (!options.allowUnauthorizedMembers && !hasAccess) {

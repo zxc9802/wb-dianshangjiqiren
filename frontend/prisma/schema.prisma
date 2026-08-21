@@ -13,6 +13,7 @@ model User {
   isVerified      Boolean   @default(false) @map("is_verified")
   role            String    @default("member")
   accessGrantedAt DateTime? @map("access_granted_at")
+  isActive        Boolean   @default(true) @map("is_active")
   nickname        String    @default("")
   groupName       String    @default("") @map("group_name")
   avatar          String    @default("")

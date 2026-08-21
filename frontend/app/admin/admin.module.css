@@ -400,6 +400,40 @@
     box-shadow: inset 3px 0 0 var(--color-primary);
 }
 
+.memberButtonInactive {
+    opacity: 0.62;
+}
+
+.showDisabled {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    color: var(--color-muted-foreground);
+    font-size: 13px;
+}
+
+.showDisabled input {
+    accent-color: var(--color-primary);
+}
+
+.memberAccountBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-background) 70%, var(--color-card));
+    color: var(--color-muted-foreground);
+    font-size: 13px;
+}
+
+.memberIdentityDisabled em {
+    background: color-mix(in srgb, #b45309 12%, var(--color-card));
+    color: #b45309;
+}
+
 .permissionPanel {
     min-width: 0;
     overflow: hidden;

@@ -50,6 +50,8 @@ export default function AdminConsolePage() {
     const [loadingAccess, setLoadingAccess] = useState(false);
     const [saving, setSaving] = useState(false);
     const [busyOptionId, setBusyOptionId] = useState('');
+    const [busyMemberId, setBusyMemberId] = useState('');
+    const [showDisabledMembers, setShowDisabledMembers] = useState(false);
     const [addingKind, setAddingKind] = useState<OptionKind | ''>('');
     const [error, setError] = useState('');
     const [status, setStatus] = useState('');
@@ -114,8 +116,11 @@ export default function AdminConsolePage() {
             ]);
             setMembers(memberResponse.data);
             setCatalog(catalogResponse.data);
-            const preferred = memberResponse.data.find((member) => member.id === selectedMemberId)
-                || memberResponse.data[0];
+            const preferred = memberResponse.data.find((member) => (
+                member.id === selectedMemberId && (showDisabledMembers || member.isActive !== false)
+            ))
+                || memberResponse.data.find((member) => member.isActive !== false)
+                || (showDisabledMembers ? memberResponse.data[0] : undefined);
             if (preferred) {
                 setMemberDraft(preferred, catalogResponse.data);
             } else {
@@ -132,7 +137,7 @@ export default function AdminConsolePage() {
         } finally {
             setLoadingAccess(false);
         }
-    }, [selectedMemberId, setMemberDraft]);
+    }, [selectedMemberId, setMemberDraft, showDisabledMembers]);
 
     useEffect(() => {
         if (activeTab === 'access' && isAuthenticated && user?.role === 'admin') {
@@ -148,11 +153,13 @@ export default function AdminConsolePage() {
     const isDirty = isBotDirty || isRoleDirty;
 
     const normalizedMemberSearch = memberSearch.trim().toLowerCase();
-    const filteredMembers = members.filter((member) => !normalizedMemberSearch || [
+    const visibleMembers = members.filter((member) => showDisabledMembers || member.isActive !== false);
+    const filteredMembers = visibleMembers.filter((member) => !normalizedMemberSearch || [
         member.account,
         member.nickname,
         member.groupName,
     ].some((value) => value.toLowerCase().includes(normalizedMemberSearch)));
+    const canEditSelectedMember = Boolean(selectedMember && selectedMember.isActive !== false);
 
     const catalogGroups = useMemo(() => {
         const groups = new Map<string, OfficialBotCatalogEntry[]>();
@@ -263,7 +270,7 @@ export default function AdminConsolePage() {
     }
 
     async function saveAccess() {
-        if (!selectedMember || saving || !isDirty) return;
+        if (!selectedMember || saving || !isDirty || !selectedMember.isActive) return;
         setSaving(true);
         setError('');
         setStatus('');
@@ -285,7 +292,7 @@ export default function AdminConsolePage() {
     }
 
     async function restoreDefault() {
-        if (!selectedMember || saving) return;
+        if (!selectedMember || saving || !selectedMember.isActive) return;
         if (!window.confirm('恢复后该成员将默认可用全部官方智能体，确定继续吗？')) return;
         setSaving(true);
         setError('');
@@ -302,7 +309,7 @@ export default function AdminConsolePage() {
     }
 
     async function restoreDefaultRoles() {
-        if (!selectedMember || saving) return;
+        if (!selectedMember || saving || !selectedMember.isActive) return;
         if (!window.confirm('恢复后该成员将默认可用起芽知识库的全部岗位，确定继续吗？')) return;
         setSaving(true);
         setError('');
@@ -315,6 +322,47 @@ export default function AdminConsolePage() {
             setError(err instanceof Error ? err.message : '恢复默认岗位失败。');
         } finally {
             setSaving(false);
+        }
+    }
+
+    async function toggleMemberActive() {
+        if (!selectedMember || busyMemberId) return;
+        const label = selectedMember.nickname || selectedMember.account;
+        if (selectedMember.isActive && !window.confirm(`停用“${label}”后，该账号无法登录，也不会再出现在权限设置中。确定继续吗？`)) {
+            return;
+        }
+        setBusyMemberId(selectedMember.id);
+        setError('');
+        setStatus('');
+        try {
+            await api.updateAdminMember(selectedMember.id, { isActive: !selectedMember.isActive });
+            await loadAccessData();
+            setStatus(`已${selectedMember.isActive ? '停用' : '恢复'}“${label}”。`);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : '更新账号状态失败。');
+        } finally {
+            setBusyMemberId('');
+        }
+    }
+
+    async function deleteMember() {
+        if (!selectedMember || busyMemberId) return;
+        const label = selectedMember.nickname || selectedMember.account;
+        if (!window.confirm(`删除“${label}”后账号无法恢复，权限设置中将不再显示。确定删除吗？`)) {
+            return;
+        }
+        setBusyMemberId(selectedMember.id);
+        setError('');
+        setStatus('');
+        try {
+            await api.deleteAdminMember(selectedMember.id);
+            setSelectedMemberId('');
+            await loadAccessData();
+            setStatus(`已删除账号“${label}”。`);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : '删除账号失败。');
+        } finally {
+            setBusyMemberId('');
         }
     }
 
@@ -458,7 +506,7 @@ export default function AdminConsolePage() {
                     <div className={styles.sectionIntro}>
                         <div>
                             <h2>成员智能体权限</h2>
-                            <p>未单独配置的成员默认可用全部官方智能体和知识库岗位；“我的智能体”不受这里控制。</p>
+                            <p>未单独配置的成员默认可用全部官方智能体和知识库岗位。停用或删除账号后，该成员不会出现在权限设置中，也无法登录。注册选项里的姓名/组别删除不会删除已有账号。</p>
                         </div>
                         <button type="button" className={styles.actionButton} onClick={() => void loadAccessData()} disabled={loadingAccess}>
                             <RefreshCw size={16} className={loadingAccess ? styles.spinning : ''} /> 刷新
@@ -474,6 +522,14 @@ export default function AdminConsolePage() {
                                     placeholder="搜索账号、姓名或组别"
                                 />
                             </label>
+                            <label className={styles.showDisabled}>
+                                <input
+                                    type="checkbox"
+                                    checked={showDisabledMembers}
+                                    onChange={(event) => setShowDisabledMembers(event.target.checked)}
+                                />
+                                显示已停用
+                            </label>
                             <div className={styles.memberList}>
                                 {filteredMembers.length === 0 ? (
                                     <p className={styles.emptyState}>{loadingAccess ? '正在加载成员...' : '没有匹配的成员。'}</p>
@@ -481,12 +537,12 @@ export default function AdminConsolePage() {
                                     <button
                                         key={member.id}
                                         type="button"
-                                        className={`${styles.memberButton} ${member.id === selectedMemberId ? styles.memberButtonActive : ''}`}
+                                        className={`${styles.memberButton} ${member.id === selectedMemberId ? styles.memberButtonActive : ''} ${member.isActive === false ? styles.memberButtonInactive : ''}`}
                                         onClick={() => selectMember(member)}
                                     >
                                         <strong>{member.nickname || '未填写姓名'}</strong>
                                         <code>{member.account}</code>
-                                        <span>{member.groupName || '未填写组别'}</span>
+                                        <span>{member.isActive === false ? '已停用' : (member.groupName || '未填写组别')}</span>
                                     </button>
                                 ))}
                             </div>
@@ -495,12 +551,37 @@ export default function AdminConsolePage() {
                         <div className={styles.permissionPanel}>
                             {selectedMember ? (
                                 <>
-                                    <div className={styles.memberIdentity}>
+                                    <div className={`${styles.memberIdentity} ${selectedMember.isActive ? '' : styles.memberIdentityDisabled}`}>
                                         <strong>{selectedMember.nickname || '未填写姓名'}</strong>
                                         <span>账号：{selectedMember.account}</span>
                                         <span>组别：{selectedMember.groupName || '未填写组别'}</span>
-                                        <em>{savedMode === 'all' ? '智能体默认全部' : '智能体已配置'} · {savedRoleMode === 'all' ? '岗位默认全部' : '岗位已配置'}</em>
+                                        <em>{selectedMember.isActive
+                                            ? `${savedMode === 'all' ? '智能体默认全部' : '智能体已配置'} · ${savedRoleMode === 'all' ? '岗位默认全部' : '岗位已配置'}`
+                                            : '账号已停用'}</em>
                                     </div>
+                                    <div className={styles.memberAccountBar}>
+                                        <span>{selectedMember.isActive ? '可设置该成员权限' : '已停用账号不能设置权限，可恢复或删除。'}</span>
+                                        <div className={styles.optionActions}>
+                                            <button
+                                                type="button"
+                                                className={styles.textButton}
+                                                onClick={() => void toggleMemberActive()}
+                                                disabled={Boolean(busyMemberId)}
+                                            >
+                                                {busyMemberId === selectedMember.id ? '处理中' : selectedMember.isActive ? '停用账号' : '恢复账号'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={styles.dangerTextButton}
+                                                onClick={() => void deleteMember()}
+                                                disabled={Boolean(busyMemberId)}
+                                            >
+                                                删除账号
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {canEditSelectedMember ? (
+                                        <>
                                     <div className={styles.permissionToolbar}>
                                         <span>已选 {draftBotKeys.length} / {catalog.length}</span>
                                         <div>
@@ -564,11 +645,15 @@ export default function AdminConsolePage() {
                                             type="button"
                                             className={styles.primaryButton}
                                             onClick={() => void saveAccess()}
-                                            disabled={!isDirty || saving}
+                                            disabled={!isDirty || saving || !canEditSelectedMember}
                                         >
                                             {saving ? '保存中...' : '保存权限'}
                                         </button>
                                     </div>
+                                        </>
+                                    ) : (
+                                        <p className={styles.emptyState}>该账号已停用，无法设置权限。</p>
+                                    )}
                                 </>
                             ) : (
                                 <p className={styles.emptyState}>选择左侧成员后配置智能体权限。</p>

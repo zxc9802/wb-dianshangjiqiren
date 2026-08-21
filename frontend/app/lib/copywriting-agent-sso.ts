@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { AppError } from './auth';
+import { AppError, assertMemberAccountEnabled } from './auth';
 import { prisma } from './prisma';
 import { readServerEnv } from './server-env';
 import { COPYWRITING_AGENT_SITE_METADATA } from './copywriting-agent-site';
@@ -124,6 +124,7 @@ export async function consumeCopywritingAgentSsoTicket(ticketId: string) {
                 groupName: true,
                 role: true,
                 accessGrantedAt: true,
+                isActive: true,
                 authTokenVersion: true,
             },
         });
@@ -132,6 +133,7 @@ export async function consumeCopywritingAgentSsoTicket(ticketId: string) {
             throw new AppError('Account not found.', 404);
         }
 
+        assertMemberAccountEnabled(user);
         const hasAccess = user.role === 'admin' || Boolean(user.accessGrantedAt);
         if (!hasAccess) {
             throw new AppError('Invite code required.', 403, 'INVITE_REQUIRED');
