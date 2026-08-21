@@ -126,6 +126,14 @@ export async function consumeKbChatSsoTicket(ticketId: string) {
                 role: true,
                 accessGrantedAt: true,
                 authTokenVersion: true,
+                kbChatRolePolicy: {
+                    select: {
+                        permissions: {
+                            select: { roleKey: true },
+                            orderBy: { createdAt: 'asc' },
+                        },
+                    },
+                },
             },
         });
 
@@ -162,6 +170,12 @@ export async function consumeKbChatSsoTicket(ticketId: string) {
                 groupName: user.groupName,
                 role: user.role,
                 authTokenVersion: user.authTokenVersion,
+                kbChatRoles: user.role === 'admin' || !user.kbChatRolePolicy
+                    ? { mode: 'all' as const, roleKeys: [] as string[] }
+                    : {
+                        mode: 'selected' as const,
+                        roleKeys: user.kbChatRolePolicy.permissions.map((item) => item.roleKey),
+                    },
             },
         };
     });

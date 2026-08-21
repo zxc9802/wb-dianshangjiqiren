@@ -53,6 +53,7 @@
 .actionButton,
 .primaryButton,
 .textButton,
+.dangerTextButton,
 .memberButton,
 .tabButton {
     min-height: 44px;
@@ -278,16 +279,35 @@
     text-decoration: line-through;
 }
 
-.textButton {
+.optionActions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 2px;
+}
+
+.textButton,
+.dangerTextButton {
     padding: 0 10px;
     border-radius: 9px;
-    color: var(--color-primary);
     font-size: 13px;
     font-weight: 650;
 }
 
+.textButton {
+    color: var(--color-primary);
+}
+
 .textButton:hover:not(:disabled) {
     background: color-mix(in srgb, var(--color-primary) 9%, transparent);
+}
+
+.dangerTextButton {
+    color: var(--color-danger);
+}
+
+.dangerTextButton:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-danger) 9%, transparent);
 }
 
 .emptyState {
@@ -461,6 +481,18 @@
     font-weight: 750;
 }
 
+.roleHint {
+    margin: 0 0 12px;
+    color: var(--color-muted-foreground);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.botGroup .permissionToolbar {
+    padding: 0 0 12px;
+    border-bottom: 0;
+}
+
 .botGrid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -535,6 +567,7 @@
 .actionButton:focus-visible,
 .primaryButton:focus-visible,
 .textButton:focus-visible,
+.dangerTextButton:focus-visible,
 .memberButton:focus-visible,
 .optionInput:focus-visible,
 .backButton:focus-visible,
@@ -547,7 +580,8 @@
 
 .actionButton:disabled,
 .primaryButton:disabled,
-.textButton:disabled {
+.textButton:disabled,
+.dangerTextButton:disabled {
     opacity: 0.55;
     cursor: not-allowed;
     transform: none;

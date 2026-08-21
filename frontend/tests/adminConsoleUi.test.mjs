@@ -16,6 +16,23 @@ test('home exposes separate admin and invite-code links only in the admin guard'
   assert.match(home, /requireAuth\('\/admin\/invite-codes'\).*邀请码管理/s)
 })
 
+test('registration options keep deactivate and add delete for names and groups', async () => {
+  const page = await readFile(adminPagePath, 'utf8')
+  assert.match(page, /deleteAdminRegistrationOption/)
+  assert.match(page, /item\.isActive \? '停用' : '恢复'/)
+  assert.match(page, /void deleteOption\(item\)/)
+  assert.match(page, /停用或删除只影响后续注册/)
+})
+
+test('permission editor includes knowledge-base role checkboxes for each member', async () => {
+  const page = await readFile(adminPagePath, 'utf8')
+  assert.match(page, /起芽知识库岗位/)
+  assert.match(page, /replaceAdminMemberKbChatRoles/)
+  assert.match(page, /resetAdminMemberKbChatRoles/)
+  assert.match(page, /恢复默认全部岗位/)
+  assert.match(page, /KB_CHAT_ROLES/)
+})
+
 test('permission editor pins account and name above categorized bot checkboxes', async () => {
   const page = await readFile(adminPagePath, 'utf8')
   assert.match(page, /selectedMember\.account/)

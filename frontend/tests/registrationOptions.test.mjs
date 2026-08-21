@@ -59,6 +59,15 @@ test('both selected values must match an active option', async () => {
   )
 })
 
+test('admin can delete a registration option without removing deactivate', async () => {
+  const optionRoutePath = path.join(appRoot, 'api', 'admin', 'registration-options', '[id]', 'route.ts')
+  const source = await readFile(optionRoutePath, 'utf8')
+  assert.match(source, /export async function PATCH/)
+  assert.match(source, /export async function DELETE/)
+  assert.match(source, /registrationOption\.deleteMany/)
+  assert.match(source, /isActive/)
+})
+
 test('auth validates current options before consuming an invite code', async () => {
   const source = await readFile(authRoutePath, 'utf8')
   assert.match(source, /server-registration-options/)

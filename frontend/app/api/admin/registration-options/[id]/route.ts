@@ -26,3 +26,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         return errorResponse(error);
     }
 }
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    try {
+        await getAuthUser(req, { requireAdmin: true });
+        const { id } = await params;
+        const result = await prisma.registrationOption.deleteMany({
+            where: { id },
+        });
+        if (result.count === 0) {
+            throw new AppError('Registration option not found.', 404, 'REGISTRATION_OPTION_NOT_FOUND');
+        }
+        return Response.json({ success: true });
+    } catch (error) {
+        return errorResponse(error);
+    }
+}
