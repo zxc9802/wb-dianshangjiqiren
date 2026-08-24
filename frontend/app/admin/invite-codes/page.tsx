@@ -386,7 +386,7 @@ export default function InviteCodesPage() {
                                 <div className={styles.batchMeta}>
                                     <span>已用 {batch.usedCount}</span>
                                     <span>未用 {batch.unusedCount}</span>
-                                    <span>创建人 {batch.createdBy.nickname || batch.createdBy.account}</span>
+                                    <span>创建人 {batch.createdBy.account}</span>
                                 </div>
                             </button>
                         ))}
@@ -538,7 +538,7 @@ export default function InviteCodesPage() {
                                                     </span>
                                                 </td>
                                                 <td>{item.usedBy?.account || '-'}</td>
-                                                <td>{item.usedBy?.nickname || '-'}</td>
+                                                <td>{item.usedBy?.account || '-'}</td>
                                                 <td>{item.usedBy?.groupName || '-'}</td>
                                                 <td>{item.usedAt ? new Date(item.usedAt).toLocaleString('zh-CN') : '-'}</td>
                                                 <td>
@@ -549,7 +549,7 @@ export default function InviteCodesPage() {
                                                             onClick={() => void handleRevokeUsage({
                                                                 inviteCodeId: item.id,
                                                                 batchId: item.batchId,
-                                                                usedByLabel: item.usedBy ? (item.usedBy.nickname || item.usedBy.account) : '',
+                                                                usedByLabel: item.usedBy ? item.usedBy.account : '',
                                                                 code: item.code,
                                                             })}
                                                             disabled={revokingId === item.id}
@@ -605,7 +605,7 @@ export default function InviteCodesPage() {
                                                 <td>{new Date(item.batchCreatedAt).toLocaleString('zh-CN')}</td>
                                                 <td className={styles.remarkCell}>{item.batchRemark || '未备注'}</td>
                                                 <td>{item.usedBy?.account || '-'}</td>
-                                                <td>{item.usedBy?.nickname || '-'}</td>
+                                                <td>{item.usedBy?.account || '-'}</td>
                                                 <td>{item.usedBy?.groupName || '-'}</td>
                                                 <td>{item.usedAt ? new Date(item.usedAt).toLocaleString('zh-CN') : '-'}</td>
                                                 <td>
@@ -624,7 +624,7 @@ export default function InviteCodesPage() {
                                                                 onClick={() => void handleRevokeUsage({
                                                                     inviteCodeId: item.inviteCodeId,
                                                                     batchId: item.batchId,
-                                                                    usedByLabel: item.usedBy ? (item.usedBy.nickname || item.usedBy.account) : '',
+                                                                    usedByLabel: item.usedBy ? item.usedBy.account : '',
                                                                     code: item.code,
                                                                 })}
                                                                 disabled={revokingId === item.inviteCodeId}

@@ -41,7 +41,7 @@ export async function assertLoginAccountAvailable(
 ): Promise<void> {
     const normalized = account.trim();
     if (!normalized) {
-        throw new AppError('请填写账号名称。', 400);
+        throw new AppError('请填写账号。', 400);
     }
 
     const existing = await client.user.findFirst({
@@ -56,6 +56,6 @@ export async function assertLoginAccountAvailable(
     });
 
     if (existing) {
-        throw new AppError('该账号名称已被使用。', 409, 'ACCOUNT_EXISTS');
+        throw new AppError('该账号已被使用。', 409, 'ACCOUNT_EXISTS');
     }
 }

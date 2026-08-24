@@ -130,7 +130,7 @@ export const api = {
 
     getMe: () => request<{ success: boolean; data: UserInfo }>('/auth/me'),
 
-    updateProfile: (body: { nickname: string }) =>
+    updateProfile: (body: { account: string }) =>
         request<{ success: boolean; data: UserInfo }>('/auth/me', { method: 'PATCH', body: JSON.stringify(body) }),
 
     // Admin member directory

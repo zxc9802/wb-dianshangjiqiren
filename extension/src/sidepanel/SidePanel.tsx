@@ -468,7 +468,7 @@ export default function SidePanel() {
 
   const assistantName = selectedBot?.name || '插件助手';
   const statusText = authState === 'ready'
-    ? `${session?.user.nickname || session?.user.account}${typeof pointsBalance === 'number' ? ` · ${pointsBalance} 积分` : ''}`
+    ? `${session?.user.account}${typeof pointsBalance === 'number' ? ` · ${pointsBalance} 积分` : ''}`
     : '请先在主站登录，再回到侧边栏使用总结、对话和绘图功能。';
 
   return (

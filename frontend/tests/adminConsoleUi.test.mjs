@@ -37,7 +37,6 @@ test('permission editor includes knowledge-base role checkboxes for each member'
 test('permission editor pins account and group assignment above categorized bot checkboxes', async () => {
   const page = await readFile(adminPagePath, 'utf8')
   assert.match(page, /selectedMember\.account/)
-  assert.match(page, /selectedMember\.nickname/)
   assert.match(page, /selectedMember\.groupName/)
   assert.match(page, /assignMemberGroup/)
   assert.match(page, /分配组别/)

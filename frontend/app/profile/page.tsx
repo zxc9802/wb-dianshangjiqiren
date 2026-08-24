@@ -11,7 +11,7 @@ export default function ProfilePage() {
     const router = useRouter();
     const { user, logout } = useAuthStore();
     const [isEditing, setIsEditing] = useState(false);
-    const [nickname, setNickname] = useState('');
+    const [account, setAccount] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
 
@@ -23,27 +23,27 @@ export default function ProfilePage() {
             }
         }
         if (user && !isEditing) {
-            setNickname(user.nickname);
+            setAccount(user.account);
         }
     }, [isEditing, router, user]);
 
-    const handleSaveNickname = async () => {
-        const nextNickname = nickname.trim();
-        if (!nextNickname || !user || isSaving) return;
+    const handleSaveAccount = async () => {
+        const nextAccount = account.trim();
+        if (!nextAccount || !user || isSaving) return;
 
         setIsSaving(true);
         setFeedback(null);
 
         try {
-            const response = await api.updateProfile({ nickname: nextNickname });
+            const response = await api.updateProfile({ account: nextAccount });
             const nextUser = response.data;
             localStorage.setItem('user', JSON.stringify(nextUser));
             useAuthStore.setState({ user: nextUser });
-            setNickname(nextUser.nickname);
+            setAccount(nextUser.account);
             setIsEditing(false);
-            setFeedback({ type: 'success', message: '账号名称已保存，请用新名称登录。' });
+            setFeedback({ type: 'success', message: '账号已保存，请用新账号登录。' });
         } catch (error) {
-            setFeedback({ type: 'error', message: error instanceof Error ? error.message : '账号名称保存失败。' });
+            setFeedback({ type: 'error', message: error instanceof Error ? error.message : '账号保存失败。' });
         } finally {
             setIsSaving(false);
         }
@@ -63,10 +63,9 @@ export default function ProfilePage() {
 
                 <div className={styles.avatarSection}>
                     <div className={styles.avatar}>
-                        {(user.nickname || user.account).slice(0, 1).toUpperCase()}
+                        {user.account.slice(0, 1).toUpperCase()}
                     </div>
-                    <h3 className={styles.sidebarName}>{user.nickname || user.account}</h3>
-                    <p className={styles.sidebarPhone}>{user.account}</p>
+                    <h3 className={styles.sidebarName}>{user.account}</h3>
                 </div>
 
                 <nav className={styles.sidebarNav}>
@@ -90,7 +89,7 @@ export default function ProfilePage() {
                     <Settings size={20} />
                     账号设置
                 </h2>
-                <p className={styles.pageHint}>注册后可自行修改账号名称。改完后请用新的账号名称登录，原账号将不能再登录。</p>
+                <p className={styles.pageHint}>注册后可自行修改账号。改完后请用新账号登录，原账号将不能再登录。</p>
 
                 {feedback && (
                     <div className={feedback.type === 'success' ? styles.successText : styles.errorText}>
@@ -100,28 +99,28 @@ export default function ProfilePage() {
 
                 <div className={styles.settingsCard}>
                     <div className={styles.settingRow}>
-                        <span className={styles.settingLabel}>账号名称</span>
+                        <span className={styles.settingLabel}>账号</span>
                         {isEditing ? (
                             <div className={styles.editRow}>
                                 <input
                                     type="text"
-                                    value={nickname}
+                                    value={account}
                                     onChange={(event) => {
-                                        setNickname(event.target.value);
+                                        setAccount(event.target.value);
                                         setFeedback(null);
                                     }}
-                                    placeholder="请输入账号名称"
+                                    placeholder="请输入账号"
                                     className={styles.editInput}
                                     disabled={isSaving}
                                 />
-                                <button className={styles.saveBtn} onClick={() => void handleSaveNickname()} disabled={isSaving || !nickname.trim()}>
+                                <button className={styles.saveBtn} onClick={() => void handleSaveAccount()} disabled={isSaving || !account.trim()}>
                                     {isSaving ? '保存中...' : '保存'}
                                 </button>
                                 <button
                                     className={styles.cancelBtn}
                                     onClick={() => {
                                         setIsEditing(false);
-                                        setNickname(user.nickname);
+                                        setAccount(user.account);
                                         setFeedback(null);
                                     }}
                                     disabled={isSaving}
@@ -131,11 +130,11 @@ export default function ProfilePage() {
                             </div>
                         ) : (
                             <div className={styles.settingValue}>
-                                <span>{user.nickname || '-'}</span>
+                                <span>{user.account}</span>
                                 <button
                                     className={styles.editBtnSmall}
                                     onClick={() => {
-                                        setNickname(user.nickname);
+                                        setAccount(user.account);
                                         setIsEditing(true);
                                         setFeedback(null);
                                     }}
@@ -144,11 +143,6 @@ export default function ProfilePage() {
                                 </button>
                             </div>
                         )}
-                    </div>
-
-                    <div className={styles.settingRow}>
-                        <span className={styles.settingLabel}>账号</span>
-                        <span className={styles.settingValue}>{user.account}</span>
                     </div>
 
                     <div className={styles.settingRow}>

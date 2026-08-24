@@ -106,7 +106,7 @@ function LoginPageContent() {
                                     setAccount(event.target.value);
                                     if (error) setError('');
                                 }}
-                                placeholder="请输入账号名称"
+                                placeholder="请输入账号"
                                 required
                                 className={styles.input}
                             />

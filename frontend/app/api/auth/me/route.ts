@@ -7,7 +7,7 @@ import { assertLoginAccountAvailable } from '../../../lib/server-account-lookup'
 import { getUserBotAccessSummary } from '../../../lib/server-bot-access';
 
 const updateProfileSchema = z.object({
-    nickname: z.string().trim().min(1, '请填写账号名称。'),
+    account: z.string().trim().min(1, '请填写账号。'),
 });
 
 function serializeUser(user: {
@@ -47,14 +47,14 @@ export async function PATCH(req: NextRequest) {
     try {
         const user = await getAuthUser(req);
         const data = updateProfileSchema.parse(await req.json());
-        const nextNickname = data.nickname.trim();
-        await assertLoginAccountAvailable(prisma, nextNickname, user.id);
+        const nextAccount = data.account.trim();
+        await assertLoginAccountAvailable(prisma, nextAccount, user.id);
 
         const updated = await prisma.user.update({
             where: { id: user.id },
             data: {
-                email: nextNickname,
-                nickname: nextNickname,
+                email: nextAccount,
+                nickname: nextAccount,
             },
             select: {
                 id: true,
@@ -79,7 +79,7 @@ export async function PATCH(req: NextRequest) {
         });
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-            return errorResponse(new AppError('该账号名称已被使用。', 409, 'ACCOUNT_EXISTS'));
+            return errorResponse(new AppError('该账号已被使用。', 409, 'ACCOUNT_EXISTS'));
         }
         return errorResponse(err);
     }

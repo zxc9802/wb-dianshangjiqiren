@@ -18,6 +18,7 @@ test('registration only asks for account password and invite code', async () => 
   assert.doesNotMatch(loginPage, /请选择姓名/)
   assert.doesNotMatch(loginPage, /请选择组别/)
   assert.doesNotMatch(loginPage, /FIXED_MEMBER_NAMES|FIXED_GROUP_NAMES/)
+  assert.doesNotMatch(loginPage, /账号名称/)
 })
 
 test('the rejected fixed member directory is removed', async () => {

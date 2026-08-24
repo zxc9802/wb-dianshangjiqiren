@@ -103,7 +103,7 @@ export default function InsightsPage() {
                     </Link>
                     <h1 className={styles.title}>网页洞察</h1>
                     <p className={styles.subtitle}>
-                        {user?.nickname || '当前用户'} 在插件里保存的网页总结和对话记录。
+                        {user?.account || '当前用户'} 在插件里保存的网页总结和对话记录。
                     </p>
                 </div>
             </header>

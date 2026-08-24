@@ -306,7 +306,7 @@ export default function AdminConsolePage() {
                 const response = await api.replaceAdminMemberKbChatRoles(selectedMember.id, draftRoleKeys);
                 applyMemberKbChatRoles(selectedMember.id, response.data);
             }
-            setStatus(`已保存 ${selectedMember.nickname || selectedMember.account} 的权限。`);
+            setStatus(`已保存 ${selectedMember.account} 的权限。`);
         } catch (err) {
             setError(err instanceof Error ? err.message : '保存权限失败。');
         } finally {
@@ -323,7 +323,7 @@ export default function AdminConsolePage() {
         try {
             const response = await api.resetAdminMemberBotAccess(selectedMember.id);
             applyMemberAccess(selectedMember.id, response.data);
-            setStatus(`已恢复 ${selectedMember.nickname || selectedMember.account} 的默认全部智能体权限。`);
+            setStatus(`已恢复 ${selectedMember.account} 的默认全部智能体权限。`);
         } catch (err) {
             setError(err instanceof Error ? err.message : '恢复默认权限失败。');
         } finally {
@@ -340,7 +340,7 @@ export default function AdminConsolePage() {
         try {
             const response = await api.resetAdminMemberKbChatRoles(selectedMember.id);
             applyMemberKbChatRoles(selectedMember.id, response.data);
-            setStatus(`已恢复 ${selectedMember.nickname || selectedMember.account} 的默认全部知识库岗位。`);
+            setStatus(`已恢复 ${selectedMember.account} 的默认全部知识库岗位。`);
         } catch (err) {
             setError(err instanceof Error ? err.message : '恢复默认岗位失败。');
         } finally {
@@ -539,7 +539,7 @@ export default function AdminConsolePage() {
                                 <input
                                     value={memberSearch}
                                     onChange={(event) => setMemberSearch(event.target.value)}
-                                    placeholder="搜索账号、名称或组别"
+                                    placeholder="搜索账号或组别"
                                 />
                             </label>
                             <label className={styles.showDisabled}>
@@ -560,8 +560,7 @@ export default function AdminConsolePage() {
                                         className={`${styles.memberButton} ${member.id === selectedMemberId ? styles.memberButtonActive : ''} ${member.isActive === false ? styles.memberButtonInactive : ''}`}
                                         onClick={() => selectMember(member)}
                                     >
-                                        <strong>{member.nickname || member.account}</strong>
-                                        <code>{member.account}</code>
+                                        <strong>{member.account}</strong>
                                         <span>{member.isActive === false ? '已停用' : (member.groupName || '未分配组别')}</span>
                                     </button>
                                 ))}
@@ -572,8 +571,7 @@ export default function AdminConsolePage() {
                             {selectedMember ? (
                                 <>
                                     <div className={`${styles.memberIdentity} ${selectedMember.isActive ? '' : styles.memberIdentityDisabled}`}>
-                                        <strong>{selectedMember.nickname || selectedMember.account}</strong>
-                                        <span>账号：{selectedMember.account}</span>
+                                        <strong>{selectedMember.account}</strong>
                                         <span>组别：{selectedMember.groupName || '未分配组别'}</span>
                                         <em>{selectedMember.isActive
                                             ? `${savedMode === 'all' ? '智能体默认全部' : '智能体已配置'} · ${savedRoleMode === 'all' ? '岗位默认全部' : '岗位已配置'}`

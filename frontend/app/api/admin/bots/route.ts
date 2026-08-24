@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
             for (const bot of customBots) {
                 results.push({
                     id: bot.id,
-                    name: `${bot.name} (${bot.user.nickname || bot.user.email})`,
+                    name: `${bot.name} (${bot.user.email})`,
                     kind: 'custom',
                     category: '自建',
                     icon: bot.icon,
