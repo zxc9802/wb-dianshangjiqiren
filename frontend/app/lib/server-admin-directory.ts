@@ -3,6 +3,7 @@ import type { BotAccessSummary } from './bot-access';
 import { isOfficialBotKey } from './bot-access-catalog';
 import { isKbChatRoleKey, type KbChatRoleAccessSummary } from './kb-chat-roles';
 import { prisma } from './prisma';
+import { assertActiveGroupOption } from './server-registration-options';
 
 const MEMBER_DELETE_TRANSACTION_OPTIONS = {
     maxWait: 10_000,
@@ -101,6 +102,20 @@ export async function setMemberActive(userId: string, isActive: boolean): Promis
     });
 
     return { isActive };
+}
+
+export async function setMemberGroup(userId: string, groupName: string): Promise<{ groupName: string }> {
+    const normalized = groupName.trim();
+    await prisma.$transaction(async (tx) => {
+        await loadNonAdminMember(tx, userId);
+        await assertActiveGroupOption(tx, normalized);
+        await tx.user.update({
+            where: { id: userId },
+            data: { groupName: normalized },
+        });
+    });
+
+    return { groupName: normalized };
 }
 
 export async function deleteMemberAccount(userId: string, options: { releaseInviteCodeId?: string } = {}): Promise<void> {

@@ -15,7 +15,6 @@ import { useAuthStore } from '../stores/auth';
 import styles from './admin.module.css';
 
 type AdminTab = 'options' | 'access';
-type OptionKind = 'name' | 'group';
 
 function sortedKeys(keys: string[]): string[] {
     return [...keys].sort((left, right) => left.localeCompare(right));
@@ -44,7 +43,6 @@ export default function AdminConsolePage() {
     const [draftRoleKeys, setDraftRoleKeys] = useState<string[]>([]);
     const [savedRoleKeys, setSavedRoleKeys] = useState<string[]>([]);
     const [savedRoleMode, setSavedRoleMode] = useState<'all' | 'selected'>('all');
-    const [nameDraft, setNameDraft] = useState('');
     const [groupDraft, setGroupDraft] = useState('');
     const [loadingOptions, setLoadingOptions] = useState(false);
     const [loadingAccess, setLoadingAccess] = useState(false);
@@ -52,7 +50,7 @@ export default function AdminConsolePage() {
     const [busyOptionId, setBusyOptionId] = useState('');
     const [busyMemberId, setBusyMemberId] = useState('');
     const [showDisabledMembers, setShowDisabledMembers] = useState(false);
-    const [addingKind, setAddingKind] = useState<OptionKind | ''>('');
+    const [addingKind, setAddingKind] = useState(false);
     const [error, setError] = useState('');
     const [status, setStatus] = useState('');
 
@@ -160,6 +158,15 @@ export default function AdminConsolePage() {
         member.groupName,
     ].some((value) => value.toLowerCase().includes(normalizedMemberSearch)));
     const canEditSelectedMember = Boolean(selectedMember && selectedMember.isActive !== false);
+    const groupOptions = useMemo(() => {
+        const labels = options
+            .filter((item) => item.kind === 'group' && item.isActive)
+            .map((item) => item.label);
+        if (selectedMember?.groupName && !labels.includes(selectedMember.groupName)) {
+            return [selectedMember.groupName, ...labels];
+        }
+        return labels;
+    }, [options, selectedMember]);
 
     const catalogGroups = useMemo(() => {
         const groups = new Map<string, OfficialBotCatalogEntry[]>();
@@ -193,27 +200,26 @@ export default function AdminConsolePage() {
         setStatus('');
     }
 
-    async function addOption(kind: OptionKind) {
-        const label = (kind === 'name' ? nameDraft : groupDraft).trim();
+    async function addOption() {
+        const label = groupDraft.trim();
         if (!label) return;
-        setAddingKind(kind);
+        setAddingKind(true);
         setError('');
         setStatus('');
         try {
-            await api.createAdminRegistrationOption({ kind, label });
-            if (kind === 'name') setNameDraft('');
-            else setGroupDraft('');
+            await api.createAdminRegistrationOption({ kind: 'group', label });
+            setGroupDraft('');
             await loadOptions();
-            setStatus(`已添加${kind === 'name' ? '姓名' : '组别'}“${label}”。`);
+            setStatus(`已添加组别“${label}”。`);
         } catch (err) {
             setError(err instanceof Error ? err.message : '添加选项失败。');
         } finally {
-            setAddingKind('');
+            setAddingKind(false);
         }
     }
 
     async function toggleOption(item: AdminRegistrationOptionInfo) {
-        if (item.isActive && !window.confirm(`停用“${item.label}”后，新注册人员将无法选择它。确定继续吗？`)) {
+        if (item.isActive && !window.confirm(`停用“${item.label}”后，将无法再把该组别分配给成员。确定继续吗？`)) {
             return;
         }
         setBusyOptionId(item.id);
@@ -231,8 +237,7 @@ export default function AdminConsolePage() {
     }
 
     async function deleteOption(item: AdminRegistrationOptionInfo) {
-        const kindLabel = item.kind === 'name' ? '成员' : '组别';
-        if (!window.confirm(`删除${kindLabel}“${item.label}”后，新注册人员将无法选择它，已有账号不会改动。确定删除吗？`)) {
+        if (!window.confirm(`删除组别“${item.label}”后不能再分配给成员，已有账号的组别不会自动清空。确定删除吗？`)) {
             return;
         }
         setBusyOptionId(item.id);
@@ -241,11 +246,29 @@ export default function AdminConsolePage() {
         try {
             await api.deleteAdminRegistrationOption(item.id);
             await loadOptions();
-            setStatus(`已删除${kindLabel}“${item.label}”。`);
+            setStatus(`已删除组别“${item.label}”。`);
         } catch (err) {
             setError(err instanceof Error ? err.message : '删除选项失败。');
         } finally {
             setBusyOptionId('');
+        }
+    }
+
+    async function assignMemberGroup(groupName: string) {
+        if (!selectedMember || busyMemberId) return;
+        setBusyMemberId(selectedMember.id);
+        setError('');
+        setStatus('');
+        try {
+            await api.updateAdminMember(selectedMember.id, { groupName });
+            setMembers((current) => current.map((member) => (
+                member.id === selectedMember.id ? { ...member, groupName } : member
+            )));
+            setStatus(groupName ? `已将 ${selectedMember.account} 分配到“${groupName}”。` : `已清除 ${selectedMember.account} 的组别。`);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : '分配组别失败。');
+        } finally {
+            setBusyMemberId('');
         }
     }
 
@@ -327,7 +350,7 @@ export default function AdminConsolePage() {
 
     async function toggleMemberActive() {
         if (!selectedMember || busyMemberId) return;
-        const label = selectedMember.nickname || selectedMember.account;
+        const label = selectedMember.account;
         if (selectedMember.isActive && !window.confirm(`停用“${label}”后，该账号无法登录，也不会再出现在权限设置中。确定继续吗？`)) {
             return;
         }
@@ -347,7 +370,7 @@ export default function AdminConsolePage() {
 
     async function deleteMember() {
         if (!selectedMember || busyMemberId) return;
-        const label = selectedMember.nickname || selectedMember.account;
+        const label = selectedMember.account;
         if (!window.confirm(`删除“${label}”后账号无法恢复，权限设置中将不再显示。确定删除吗？`)) {
             return;
         }
@@ -378,16 +401,14 @@ export default function AdminConsolePage() {
             : [...current, roleKey]);
     }
 
-    function renderOptionSection(kind: OptionKind, title: string, description: string) {
-        const items = options.filter((item) => item.kind === kind);
-        const draft = kind === 'name' ? nameDraft : groupDraft;
-        const setDraft = kind === 'name' ? setNameDraft : setGroupDraft;
+    function renderGroupSection() {
+        const items = options.filter((item) => item.kind === 'group');
         return (
             <section className={styles.optionCard}>
                 <div className={styles.cardHeading}>
                     <div>
-                        <h2>{title}</h2>
-                        <p>{description}</p>
+                        <h2>组别列表</h2>
+                        <p>添加后可在成员权限页分配给已有账号。</p>
                     </div>
                     <span className={styles.countBadge}>{items.filter((item) => item.isActive).length} 个可用</span>
                 </div>
@@ -395,25 +416,25 @@ export default function AdminConsolePage() {
                     className={styles.optionForm}
                     onSubmit={(event) => {
                         event.preventDefault();
-                        void addOption(kind);
+                        void addOption();
                     }}
                 >
                     <input
                         className={styles.optionInput}
-                        value={draft}
-                        onChange={(event) => setDraft(event.target.value)}
-                        placeholder={kind === 'name' ? '输入成员姓名' : '输入组别名称'}
+                        value={groupDraft}
+                        onChange={(event) => setGroupDraft(event.target.value)}
+                        placeholder="输入组别名称"
                         maxLength={50}
-                        aria-label={`新增${title}`}
+                        aria-label="新增组别"
                     />
-                    <button className={styles.primaryButton} type="submit" disabled={!draft.trim() || addingKind === kind}>
+                    <button className={styles.primaryButton} type="submit" disabled={!groupDraft.trim() || addingKind}>
                         <Plus size={16} />
-                        {addingKind === kind ? '添加中' : '添加'}
+                        {addingKind ? '添加中' : '添加'}
                     </button>
                 </form>
                 <div className={styles.optionList}>
                     {items.length === 0 ? (
-                        <p className={styles.emptyState}>还没有{title}，添加后注册页面即可选择。</p>
+                        <p className={styles.emptyState}>还没有组别，添加后即可分配给成员账号。</p>
                     ) : items.map((item) => (
                         <div className={`${styles.optionRow} ${!item.isActive ? styles.optionRowDisabled : ''}`} key={item.id}>
                             <span>{item.label}</span>
@@ -457,7 +478,7 @@ export default function AdminConsolePage() {
                     </button>
                     <p className={styles.eyebrow}>ADMIN CONTROL</p>
                     <h1>管理员后台</h1>
-                    <p className={styles.subtitle}>维护注册下拉选项，并按成员控制官方智能体和起芽知识库岗位。</p>
+                    <p className={styles.subtitle}>维护组别并分配给成员账号，同时按成员控制官方智能体和起芽知识库岗位。</p>
                 </div>
                 <button type="button" className={styles.inviteButton} onClick={() => router.push('/admin/invite-codes')}>
                     <KeyRound size={17} />
@@ -471,7 +492,7 @@ export default function AdminConsolePage() {
                     className={`${styles.tabButton} ${activeTab === 'options' ? styles.tabActive : ''}`}
                     onClick={() => changeTab('options')}
                 >
-                    <Settings2 size={17} /> 注册选项
+                    <Settings2 size={17} /> 组别管理
                 </button>
                 <button
                     type="button"
@@ -489,16 +510,15 @@ export default function AdminConsolePage() {
                 <section>
                     <div className={styles.sectionIntro}>
                         <div>
-                            <h2>注册资料选项</h2>
-                            <p>姓名和组别互相独立，可自由组合。停用或删除只影响后续注册，不会改动已有账号。</p>
+                            <h2>组别管理</h2>
+                            <p>注册不再填写姓名和组别。在这里维护组别，再去成员权限页给每个账号分配。</p>
                         </div>
                         <button type="button" className={styles.actionButton} onClick={() => void loadOptions()} disabled={loadingOptions}>
                             <RefreshCw size={16} className={loadingOptions ? styles.spinning : ''} /> 刷新
                         </button>
                     </div>
                     <div className={styles.optionColumns}>
-                        {renderOptionSection('name', '姓名选项', '允许同一姓名被多个账号选择。')}
-                        {renderOptionSection('group', '组别选项', '独立维护团队、岗位或业务组名称。')}
+                        {renderGroupSection()}
                     </div>
                 </section>
             ) : (
@@ -506,7 +526,7 @@ export default function AdminConsolePage() {
                     <div className={styles.sectionIntro}>
                         <div>
                             <h2>成员智能体权限</h2>
-                            <p>未单独配置的成员默认可用全部官方智能体和知识库岗位。停用或删除账号后，该成员不会出现在权限设置中，也无法登录。注册选项里的姓名/组别删除不会删除已有账号。</p>
+                            <p>未单独配置的成员默认可用全部官方智能体和知识库岗位。可在这里给每个账号分配组别。停用或删除账号后，该成员不会出现在权限设置中，也无法登录。</p>
                         </div>
                         <button type="button" className={styles.actionButton} onClick={() => void loadAccessData()} disabled={loadingAccess}>
                             <RefreshCw size={16} className={loadingAccess ? styles.spinning : ''} /> 刷新
@@ -519,7 +539,7 @@ export default function AdminConsolePage() {
                                 <input
                                     value={memberSearch}
                                     onChange={(event) => setMemberSearch(event.target.value)}
-                                    placeholder="搜索账号、姓名或组别"
+                                    placeholder="搜索账号、名称或组别"
                                 />
                             </label>
                             <label className={styles.showDisabled}>
@@ -540,9 +560,9 @@ export default function AdminConsolePage() {
                                         className={`${styles.memberButton} ${member.id === selectedMemberId ? styles.memberButtonActive : ''} ${member.isActive === false ? styles.memberButtonInactive : ''}`}
                                         onClick={() => selectMember(member)}
                                     >
-                                        <strong>{member.nickname || '未填写姓名'}</strong>
+                                        <strong>{member.nickname || member.account}</strong>
                                         <code>{member.account}</code>
-                                        <span>{member.isActive === false ? '已停用' : (member.groupName || '未填写组别')}</span>
+                                        <span>{member.isActive === false ? '已停用' : (member.groupName || '未分配组别')}</span>
                                     </button>
                                 ))}
                             </div>
@@ -552,15 +572,27 @@ export default function AdminConsolePage() {
                             {selectedMember ? (
                                 <>
                                     <div className={`${styles.memberIdentity} ${selectedMember.isActive ? '' : styles.memberIdentityDisabled}`}>
-                                        <strong>{selectedMember.nickname || '未填写姓名'}</strong>
+                                        <strong>{selectedMember.nickname || selectedMember.account}</strong>
                                         <span>账号：{selectedMember.account}</span>
-                                        <span>组别：{selectedMember.groupName || '未填写组别'}</span>
+                                        <span>组别：{selectedMember.groupName || '未分配组别'}</span>
                                         <em>{selectedMember.isActive
                                             ? `${savedMode === 'all' ? '智能体默认全部' : '智能体已配置'} · ${savedRoleMode === 'all' ? '岗位默认全部' : '岗位已配置'}`
                                             : '账号已停用'}</em>
                                     </div>
                                     <div className={styles.memberAccountBar}>
-                                        <span>{selectedMember.isActive ? '可设置该成员权限' : '已停用账号不能设置权限，可恢复或删除。'}</span>
+                                        <label className={styles.memberGroupAssign}>
+                                            <span>分配组别</span>
+                                            <select
+                                                value={selectedMember.groupName}
+                                                disabled={!canEditSelectedMember || Boolean(busyMemberId)}
+                                                onChange={(event) => void assignMemberGroup(event.target.value)}
+                                            >
+                                                <option value="">未分配</option>
+                                                {groupOptions.map((label) => (
+                                                    <option key={label} value={label}>{label}</option>
+                                                ))}
+                                            </select>
+                                        </label>
                                         <div className={styles.optionActions}>
                                             <button
                                                 type="button"

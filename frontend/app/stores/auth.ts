@@ -9,7 +9,7 @@ interface AuthState {
     isAuthenticated: boolean;
 
     login: (account: string, password: string) => Promise<void>;
-    register: (account: string, password: string, inviteCode: string, nickname: string, groupName: string) => Promise<void>;
+    register: (account: string, password: string, inviteCode: string) => Promise<void>;
     logout: () => Promise<void>;
     loadUser: () => Promise<void>;
 }
@@ -56,8 +56,8 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ user, token, isAuthenticated: true });
     },
 
-    register: async (account, password, inviteCode, nickname, groupName) => {
-        const res = await api.register({ account, password, inviteCode, nickname, groupName });
+    register: async (account, password, inviteCode) => {
+        const res = await api.register({ account, password, inviteCode });
         const { token, user } = res.data;
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(user));

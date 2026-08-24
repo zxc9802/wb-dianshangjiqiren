@@ -11,21 +11,14 @@ import {
     revokeAuthSession,
 } from '../../lib/auth';
 import { getUserBotAccessSummary } from '../../lib/server-bot-access';
-import { assertActiveRegistrationOptions } from '../../lib/server-registration-options';
 
-const accountSchema = z.string().trim().min(3, 'Account must be at least 3 characters.').max(64, 'Account is too long.');
+const accountSchema = z.string().trim().min(1, 'Account is required.');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters.');
 const inviteCodeSchema = z.string().trim().min(6, 'Invite code is required.').max(32, 'Invite code is invalid.');
-const nicknameSchema = z.string().trim().min(1, 'Name is required.').max(20, 'Name is too long.');
-const optionalNicknameSchema = z.string().trim().max(20, 'Name is too long.').optional();
-const groupNameSchema = z.string().trim().min(1, 'Group is required.').max(50, 'Group is too long.');
-const optionalGroupNameSchema = z.string().trim().max(50, 'Group is too long.').optional();
 
 const registerSchema = z.object({
     account: accountSchema,
     password: passwordSchema,
-    nickname: nicknameSchema,
-    groupName: groupNameSchema,
     inviteCode: inviteCodeSchema,
 });
 
@@ -38,8 +31,6 @@ const activateSchema = z.object({
     account: accountSchema,
     password: z.string(),
     inviteCode: inviteCodeSchema,
-    nickname: optionalNicknameSchema,
-    groupName: optionalGroupNameSchema,
 });
 
 const AUTH_TRANSACTION_OPTIONS = {
@@ -78,10 +69,6 @@ function normalizeAccount(account: string): string {
 
 function normalizeInviteCode(code: string): string {
     return code.trim().toUpperCase();
-}
-
-function normalizeProfileValue(value: string | undefined): string {
-    return value?.trim() || '';
 }
 
 function parseRequestBody<T>(schema: z.ZodSchema<T>, body: unknown): T {
@@ -155,8 +142,6 @@ async function handleRegister(body: unknown) {
     const data = parseRequestBody(registerSchema, body);
     const account = normalizeAccount(data.account);
     const inviteCode = normalizeInviteCode(data.inviteCode);
-    const nextNickname = normalizeProfileValue(data.nickname);
-    const nextGroupName = normalizeProfileValue(data.groupName);
 
     const user = await prisma.$transaction(async (tx) => {
         const existing = await tx.user.findUnique({
@@ -182,7 +167,6 @@ async function handleRegister(body: unknown) {
                     throw new AppError('Incorrect password.', 400);
                 }
 
-                await assertActiveRegistrationOptions(tx, nextNickname, nextGroupName);
                 await consumeInviteCode(tx, inviteCode, existing.id);
 
                 return tx.user.update({
@@ -190,8 +174,6 @@ async function handleRegister(body: unknown) {
                     data: {
                         accessGrantedAt: new Date(),
                         isVerified: true,
-                        nickname: nextNickname,
-                        groupName: nextGroupName,
                     },
                     select: {
                         id: true,
@@ -208,7 +190,6 @@ async function handleRegister(body: unknown) {
             throw new AppError('Account already exists.', 409);
         }
 
-        await assertActiveRegistrationOptions(tx, nextNickname, nextGroupName);
         const passwordHash = await bcrypt.hash(data.password, 10);
         const createdUser = await tx.user.create({
             data: {
@@ -217,8 +198,8 @@ async function handleRegister(body: unknown) {
                 isVerified: true,
                 role: 'member',
                 accessGrantedAt: new Date(),
-                nickname: nextNickname,
-                groupName: nextGroupName,
+                nickname: account,
+                groupName: '',
             },
             select: {
                 id: true,
@@ -325,18 +306,6 @@ async function handleActivate(body: unknown) {
             return existing;
         }
 
-        const nextNickname = normalizeProfileValue(data.nickname) || existing.nickname.trim();
-        const nextGroupName = normalizeProfileValue(data.groupName) || existing.groupName.trim();
-
-        if (!nextNickname) {
-            throw new AppError('Name is required for activation.', 400, 'PROFILE_NAME_REQUIRED');
-        }
-
-        if (!nextGroupName) {
-            throw new AppError('Group is required for activation.', 400, 'PROFILE_GROUP_REQUIRED');
-        }
-
-        await assertActiveRegistrationOptions(tx, nextNickname, nextGroupName);
         await consumeInviteCode(tx, inviteCode, existing.id);
 
         return tx.user.update({
@@ -344,8 +313,6 @@ async function handleActivate(body: unknown) {
             data: {
                 accessGrantedAt: new Date(),
                 isVerified: true,
-                nickname: nextNickname,
-                groupName: nextGroupName,
             },
             select: {
                 id: true,

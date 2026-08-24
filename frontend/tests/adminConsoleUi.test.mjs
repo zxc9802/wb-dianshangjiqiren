@@ -16,12 +16,13 @@ test('home exposes separate admin and invite-code links only in the admin guard'
   assert.match(home, /requireAuth\('\/admin\/invite-codes'\).*邀请码管理/s)
 })
 
-test('registration options keep deactivate and add delete for names and groups', async () => {
+test('group options keep deactivate and delete, and names are no longer managed', async () => {
   const page = await readFile(adminPagePath, 'utf8')
   assert.match(page, /deleteAdminRegistrationOption/)
   assert.match(page, /item\.isActive \? '停用' : '恢复'/)
   assert.match(page, /void deleteOption\(item\)/)
-  assert.match(page, /停用或删除只影响后续注册/)
+  assert.match(page, /组别管理/)
+  assert.doesNotMatch(page, /姓名选项/)
 })
 
 test('permission editor includes knowledge-base role checkboxes for each member', async () => {
@@ -33,11 +34,13 @@ test('permission editor includes knowledge-base role checkboxes for each member'
   assert.match(page, /KB_CHAT_ROLES/)
 })
 
-test('permission editor pins account and name above categorized bot checkboxes', async () => {
+test('permission editor pins account and group assignment above categorized bot checkboxes', async () => {
   const page = await readFile(adminPagePath, 'utf8')
   assert.match(page, /selectedMember\.account/)
   assert.match(page, /selectedMember\.nickname/)
   assert.match(page, /selectedMember\.groupName/)
+  assert.match(page, /assignMemberGroup/)
+  assert.match(page, /分配组别/)
   assert.match(page, /保存权限/)
   assert.match(page, /恢复默认全部/)
 })

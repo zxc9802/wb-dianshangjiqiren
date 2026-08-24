@@ -22,7 +22,10 @@ export default function ProfilePage() {
                 router.push('/login');
             }
         }
-    }, [router, user]);
+        if (user && !isEditing) {
+            setNickname(user.nickname);
+        }
+    }, [isEditing, router, user]);
 
     const handleSaveNickname = async () => {
         const nextNickname = nickname.trim();
@@ -38,9 +41,9 @@ export default function ProfilePage() {
             useAuthStore.setState({ user: nextUser });
             setNickname(nextUser.nickname);
             setIsEditing(false);
-            setFeedback({ type: 'success', message: '姓名已保存。' });
+            setFeedback({ type: 'success', message: '账号名称已保存。' });
         } catch (error) {
-            setFeedback({ type: 'error', message: error instanceof Error ? error.message : '姓名保存失败。' });
+            setFeedback({ type: 'error', message: error instanceof Error ? error.message : '账号名称保存失败。' });
         } finally {
             setIsSaving(false);
         }
@@ -87,6 +90,7 @@ export default function ProfilePage() {
                     <Settings size={20} />
                     账号设置
                 </h2>
+                <p className={styles.pageHint}>注册后可自行修改账号名称，仅用于展示，不影响登录账号。</p>
 
                 {feedback && (
                     <div className={feedback.type === 'success' ? styles.successText : styles.errorText}>
@@ -96,7 +100,7 @@ export default function ProfilePage() {
 
                 <div className={styles.settingsCard}>
                     <div className={styles.settingRow}>
-                        <span className={styles.settingLabel}>姓名</span>
+                        <span className={styles.settingLabel}>账号名称</span>
                         {isEditing ? (
                             <div className={styles.editRow}>
                                 <input
@@ -106,7 +110,8 @@ export default function ProfilePage() {
                                         setNickname(event.target.value);
                                         setFeedback(null);
                                     }}
-                                    placeholder="请输入姓名"
+                                    placeholder="请输入账号名称"
+                                    maxLength={50}
                                     className={styles.editInput}
                                     disabled={isSaving}
                                 />

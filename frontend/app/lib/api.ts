@@ -119,7 +119,7 @@ export const api = {
     getRegistrationOptions: () =>
         request<{ success: boolean; data: RegistrationOptionsInfo }>('/registration-options'),
 
-    register: (body: { account: string; password: string; nickname: string; groupName: string; inviteCode: string }) =>
+    register: (body: { account: string; password: string; inviteCode: string }) =>
         request<{ success: boolean; data: { token: string; user: UserInfo } }>('/auth?action=register', { method: 'POST', body: JSON.stringify(body) }),
 
     login: (body: { account: string; password: string }) =>
@@ -137,7 +137,7 @@ export const api = {
     getAdminRegistrationOptions: () =>
         request<{ success: boolean; data: AdminRegistrationOptionInfo[] }>('/admin/registration-options'),
 
-    createAdminRegistrationOption: (body: { kind: 'name' | 'group'; label: string }) =>
+    createAdminRegistrationOption: (body: { kind: 'group'; label: string }) =>
         request<{ success: boolean; data: AdminRegistrationOptionInfo }>('/admin/registration-options', {
             method: 'POST',
             body: JSON.stringify(body),
@@ -157,8 +157,8 @@ export const api = {
     getAdminMembers: () =>
         request<{ success: boolean; data: AdminMemberInfo[] }>('/admin/members'),
 
-    updateAdminMember: (id: string, body: { isActive: boolean }) =>
-        request<{ success: boolean; data: { isActive: boolean } }>(`/admin/members/${id}`, {
+    updateAdminMember: (id: string, body: { isActive?: boolean; groupName?: string }) =>
+        request<{ success: boolean; data: { isActive?: boolean; groupName?: string } }>(`/admin/members/${id}`, {
             method: 'PATCH',
             body: JSON.stringify(body),
         }),

@@ -112,11 +112,25 @@
     max-width: 800px;
 }
 
+.pageHint {
+    margin: -8px 0 16px;
+    color: var(--color-muted-foreground);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
 .pageTitle {
     font-size: 20px;
     font-weight: 700;
-    margin-bottom: 24px;
+    margin-bottom: 8px;
     color: var(--color-foreground);
+}
+
+.pageHint {
+    margin: 0 0 20px;
+    color: var(--color-muted-foreground);
+    font-size: 13px;
+    line-height: 1.6;
 }
 
 /* Points card */

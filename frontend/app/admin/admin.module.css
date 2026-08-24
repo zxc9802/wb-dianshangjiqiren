@@ -429,6 +429,22 @@
     font-size: 13px;
 }
 
+.memberGroupAssign {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.memberGroupAssign select {
+    min-width: 160px;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 9px;
+    background: var(--color-card);
+    color: var(--color-foreground);
+}
+
 .memberIdentityDisabled em {
     background: color-mix(in srgb, #b45309 12%, var(--color-card));
     color: #b45309;

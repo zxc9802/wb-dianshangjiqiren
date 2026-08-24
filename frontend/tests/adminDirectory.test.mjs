@@ -16,12 +16,19 @@ class TestAppError extends Error {
   }
 }
 
-async function loadService(prisma) {
+async function loadService(prisma, groupAssert) {
   return loadTsModule(sourcePath, {
     './auth': { AppError: TestAppError },
     './bot-access-catalog': { isOfficialBotKey: (key) => ['1', '2', '3'].includes(key) },
     './kb-chat-roles': { isKbChatRoleKey: (key) => ['operation', 'product', 'new'].includes(key) },
     './prisma': { prisma },
+    './server-registration-options': {
+      assertActiveGroupOption: groupAssert || (async (_client, groupName) => {
+        if (groupName && groupName !== '运营组' && groupName !== '技术组') {
+          throw new TestAppError('组别选项已失效，请重新选择。', 400, 'REGISTRATION_OPTION_INVALID')
+        }
+      }),
+    },
   })
 }
 
@@ -159,4 +166,21 @@ test('deleting a member releases invite usage and owned records', async () => {
     where: { usedByUserId: 'member-1' },
     data: { usedByUserId: null, usedAt: null },
   })
+})
+
+test('admins can assign an active group to a member account', async () => {
+  const updates = []
+  const tx = {
+    user: {
+      findUnique: async () => ({ role: 'member', isActive: true }),
+      update: async (args) => (updates.push(args), { id: 'member-1' }),
+    },
+  }
+  const service = await loadService({ $transaction: async (callback) => callback(tx) })
+  assert.deepEqual(await service.setMemberGroup('member-1', ' 技术组 '), { groupName: '技术组' })
+  assert.equal(updates[0].data.groupName, '技术组')
+  await assert.rejects(
+    () => service.setMemberGroup('member-1', '不存在的组'),
+    (error) => error.code === 'REGISTRATION_OPTION_INVALID',
+  )
 })

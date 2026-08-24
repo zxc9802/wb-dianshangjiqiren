@@ -668,7 +668,7 @@ export default function HomePage() {
           )}
           {isAuthenticated ? (
             <>
-              <button onClick={() => router.push('/profile')} className={styles.avatarBtn}>{user?.nickname?.slice(0, 1) || '我'}</button>
+              <button onClick={() => router.push('/profile')} className={styles.avatarBtn}>{(user?.nickname || user?.account)?.slice(0, 1) || '我'}</button>
             </>
           ) : (
             <button onClick={() => router.push('/login')} className={styles.navBtn}>登录</button>
@@ -748,8 +748,8 @@ export default function HomePage() {
           {canUseGenericChat ? <section className={styles.generalComposerSection}>
             <div className={styles.heroGreeting}>
               <h2 className={styles.heroGreetingTitle}>
-                {isAuthenticated && user?.nickname
-                  ? <><span className={styles.heroGreetingHighlight}>{user.nickname}，你好</span><br />需要我为你做些什么？</>
+                {isAuthenticated && (user?.nickname || user?.account)
+                  ? <><span className={styles.heroGreetingHighlight}>{user.nickname || user.account}，你好</span><br />需要我为你做些什么？</>
                   : <><span className={styles.heroGreetingHighlight}>你好</span><br />需要我为你做些什么？</>}
               </h2>
             </div>

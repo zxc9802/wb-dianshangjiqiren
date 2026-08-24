@@ -16,24 +16,24 @@ export async function listActiveRegistrationOptions(client: RegistrationOptionCl
     };
 }
 
-export async function assertActiveRegistrationOptions(
+export async function assertActiveGroupOption(
     client: RegistrationOptionClient,
-    nickname: string,
     groupName: string,
 ): Promise<void> {
-    const matches = await client.registrationOption.findMany({
+    const normalized = groupName.trim();
+    if (!normalized) {
+        return;
+    }
+
+    const match = await client.registrationOption.findFirst({
         where: {
             isActive: true,
-            OR: [
-                { kind: 'name', label: nickname },
-                { kind: 'group', label: groupName },
-            ],
+            kind: 'group',
+            label: normalized,
         },
-        select: { kind: true, label: true },
+        select: { id: true },
     });
-    const hasName = matches.some((item) => item.kind === 'name' && item.label === nickname);
-    const hasGroup = matches.some((item) => item.kind === 'group' && item.label === groupName);
-    if (!hasName || !hasGroup) {
-        throw new AppError('姓名或组别选项已失效，请重新选择。', 400, 'REGISTRATION_OPTION_INVALID');
+    if (!match) {
+        throw new AppError('组别选项已失效，请重新选择。', 400, 'REGISTRATION_OPTION_INVALID');
     }
 }

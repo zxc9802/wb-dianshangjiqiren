@@ -9,13 +9,14 @@ const appRoot = path.join(__dirname, '..', 'app')
 const memberDirectoryPath = path.join(appRoot, 'lib', 'member-directory.ts')
 const loginPagePath = path.join(appRoot, 'login', 'page.tsx')
 
-test('registration uses independent administrator-managed selects', async () => {
+test('registration only asks for account password and invite code', async () => {
   const loginPage = await readFile(loginPagePath, 'utf8')
 
-  assert.match(loginPage, /api\.getRegistrationOptions\(\)/)
-  assert.match(loginPage, /registrationOptions\.names/)
-  assert.match(loginPage, /registrationOptions\.groups/)
-  assert.match(loginPage, /<select/)
+  assert.match(loginPage, /register\(account, password, inviteCode\)/)
+  assert.match(loginPage, /邀请码/)
+  assert.doesNotMatch(loginPage, /api\.getRegistrationOptions\(\)/)
+  assert.doesNotMatch(loginPage, /请选择姓名/)
+  assert.doesNotMatch(loginPage, /请选择组别/)
   assert.doesNotMatch(loginPage, /FIXED_MEMBER_NAMES|FIXED_GROUP_NAMES/)
 })
 

@@ -5,7 +5,7 @@ import { AppError, getAuthUser, errorResponse } from '../../../lib/auth';
 import { getUserBotAccessSummary } from '../../../lib/server-bot-access';
 
 const updateProfileSchema = z.object({
-    nickname: z.string().trim().min(1, 'Nickname is required.').max(20, 'Nickname is too long.'),
+    nickname: z.string().trim().min(1, '请填写账号名称。').max(50, '账号名称过长。'),
 });
 
 function serializeUser(user: {

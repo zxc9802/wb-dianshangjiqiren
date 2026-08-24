@@ -23,6 +23,9 @@ async function loadRegistrationOptions(rows) {
   const client = {
     registrationOption: {
       findMany: async () => rows,
+      findFirst: async ({ where }) => rows.find((item) => (
+        item.kind === where.kind && item.label === where.label
+      )) || null,
     },
   }
   const loadedModule = await loadTsModule(sourcePath, {
@@ -45,16 +48,13 @@ test('active names and groups are returned as independent lists', async () => {
   })
 })
 
-test('both selected values must match an active option', async () => {
-  const valid = await loadRegistrationOptions([
-    { kind: 'name', label: '张三' },
-    { kind: 'group', label: '直播组' },
-  ])
-  await valid.module.assertActiveRegistrationOptions(valid.client, '张三', '直播组')
+test('admin can assign only an active group option', async () => {
+  const valid = await loadRegistrationOptions([{ kind: 'group', label: '直播组' }])
+  await valid.module.assertActiveGroupOption(valid.client, '直播组')
+  await valid.module.assertActiveGroupOption(valid.client, '')
 
-  const missingGroup = await loadRegistrationOptions([{ kind: 'name', label: '张三' }])
   await assert.rejects(
-    () => missingGroup.module.assertActiveRegistrationOptions(missingGroup.client, '张三', '直播组'),
+    () => valid.module.assertActiveGroupOption(valid.client, '技术组'),
     (error) => error.status === 400 && error.code === 'REGISTRATION_OPTION_INVALID',
   )
 })
@@ -68,9 +68,12 @@ test('admin can delete a registration option without removing deactivate', async
   assert.match(source, /isActive/)
 })
 
-test('auth validates current options before consuming an invite code', async () => {
+test('registration no longer collects name or group and does not cap account length', async () => {
   const source = await readFile(authRoutePath, 'utf8')
-  assert.match(source, /server-registration-options/)
-  assert.equal([...source.matchAll(/assertActiveRegistrationOptions\(/g)].length, 3)
-  assert.equal([...source.matchAll(/assertActiveRegistrationOptions\([\s\S]*?consumeInviteCode\(/g)].length, 3)
+  assert.doesNotMatch(source, /assertActiveRegistrationOptions/)
+  assert.doesNotMatch(source, /nicknameSchema/)
+  assert.doesNotMatch(source, /groupNameSchema/)
+  assert.doesNotMatch(source, /max\(64/)
+  assert.doesNotMatch(source, /min\(3, 'Account/)
+  assert.match(source, /accountSchema = z\.string\(\)\.trim\(\)\.min\(1/)
 })

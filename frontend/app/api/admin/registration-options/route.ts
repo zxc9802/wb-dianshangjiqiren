@@ -5,7 +5,7 @@ import { AppError, errorResponse, getAuthUser } from '../../../lib/auth';
 import { prisma } from '../../../lib/prisma';
 
 const createOptionSchema = z.object({
-    kind: z.enum(['name', 'group']),
+    kind: z.literal('group'),
     label: z.string().trim().min(1).max(50),
 });
 
