@@ -3,6 +3,24 @@ import { canAccessOfficialBot, type BotAccessSummary } from './bot-access';
 import { isOfficialBotKey } from './bot-access-catalog';
 import { prisma } from './prisma';
 
+type BotAccessPolicyClient = {
+    userBotAccessPolicy: {
+        upsert: (args: {
+            where: { userId: string };
+            update: Record<string, never>;
+            create: { userId: string };
+        }) => Promise<unknown>;
+    };
+};
+
+export async function ensureEmptyBotAccessPolicy(client: BotAccessPolicyClient, userId: string): Promise<void> {
+    await client.userBotAccessPolicy.upsert({
+        where: { userId },
+        update: {},
+        create: { userId },
+    });
+}
+
 export async function getUserBotAccessSummary(userId: string, role?: string): Promise<BotAccessSummary> {
     if (role === 'admin') return { mode: 'all', botKeys: [] };
 

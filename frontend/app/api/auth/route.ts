@@ -11,7 +11,7 @@ import {
     revokeAuthSession,
 } from '../../lib/auth';
 import { findUserByLoginAccount } from '../../lib/server-account-lookup';
-import { getUserBotAccessSummary } from '../../lib/server-bot-access';
+import { ensureEmptyBotAccessPolicy, getUserBotAccessSummary } from '../../lib/server-bot-access';
 
 const accountSchema = z.string().trim().min(1, 'Account is required.');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters.');
@@ -166,6 +166,7 @@ async function handleRegister(body: unknown) {
                 }
 
                 await consumeInviteCode(tx, inviteCode, existing.id);
+                await ensureEmptyBotAccessPolicy(tx, existing.id);
 
                 return tx.user.update({
                     where: { id: existing.id },
@@ -212,6 +213,7 @@ async function handleRegister(body: unknown) {
         });
 
         await consumeInviteCode(tx, inviteCode, createdUser.id);
+        await ensureEmptyBotAccessPolicy(tx, createdUser.id);
 
         return createdUser;
     }, AUTH_TRANSACTION_OPTIONS);
@@ -299,6 +301,7 @@ async function handleActivate(body: unknown) {
         }
 
         await consumeInviteCode(tx, inviteCode, existing.id);
+        await ensureEmptyBotAccessPolicy(tx, existing.id);
 
         return tx.user.update({
             where: { id: existing.id },

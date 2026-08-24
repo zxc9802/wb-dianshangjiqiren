@@ -623,6 +623,13 @@ export default function HomePage() {
 
   const canUseGenericChat = canAccessOfficialBot(user?.botAccess, GENERIC_CHAT_BOT_ID);
   const canSubmitGeneralChat = generalPrompt.trim().length > 0 || generalAttachedFiles.length > 0;
+  const hasNoGrantedOfficialBots = Boolean(
+    isAuthenticated && user?.botAccess?.mode === 'selected' && user.botAccess.botKeys.length === 0,
+  );
+  const visibleWorkflows = WF_TEMPLATES.filter((tpl) => {
+    if (!isAuthenticated) return true;
+    return findDeniedBotKeys(user?.botAccess, tpl.steps.map((step) => step.botId)).length === 0;
+  });
 
   if (isLoading) return <div className={styles.loading}><div className={styles.spinner} /></div>;
 
@@ -723,7 +730,7 @@ export default function HomePage() {
 
         <main className={styles.main}>
           <div className={styles.workflowCards}>
-            {WF_TEMPLATES.map((wf) => (
+            {visibleWorkflows.map((wf) => (
               <div key={wf.id} className={styles.wfCard} style={{ background: wf.gradient }} onClick={() => launchWorkflow(wf)}>
                 <h3 className={styles.wfCardTitle}><Zap size={16} /> {wf.title}</h3>
                 <div className={styles.wfSteps}>
@@ -892,7 +899,7 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-          </section> : (
+          </section> : hasNoGrantedOfficialBots ? null : (
             <section className={styles.generalComposerSection}>
               <div className={styles.generalComposerCard}>
                 <p>管理员暂未向当前账号开放通用聊天。</p>
@@ -950,9 +957,11 @@ export default function HomePage() {
             </div>
           )}
 
-          {filteredBots.length === 0 && (
+          {hasNoGrantedOfficialBots ? (
+            <div className={styles.empty}><p>管理员尚未开通智能体权限，开通后即可在此使用。</p></div>
+          ) : filteredBots.length === 0 ? (
             <div className={styles.empty}><p>没有找到匹配的机器人</p></div>
-          )}
+          ) : null}
         </main>
       </div>
 

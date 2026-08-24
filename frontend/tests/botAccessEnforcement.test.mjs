@@ -31,6 +31,14 @@ test('homepage filters official cards and generic chat by member access', async 
   assert.match(home, /canAccessOfficialBot\(user\?\.botAccess, bot\.id\)/)
   assert.match(home, /canAccessOfficialBot\(user\?\.botAccess, GENERIC_CHAT_BOT_ID\)/)
   assert.match(home, /findDeniedBotKeys/)
+  assert.match(home, /hasNoGrantedOfficialBots/)
+  assert.match(home, /管理员尚未开通智能体权限/)
+})
+
+test('registration starts members with no official bot access', async () => {
+  const authRoute = await readFile(path.join(appRoot, 'api', 'auth', 'route.ts'), 'utf8')
+  assert.match(authRoute, /ensureEmptyBotAccessPolicy\(tx, createdUser\.id\)/)
+  assert.match(authRoute, /ensureEmptyBotAccessPolicy\(tx, existing\.id\)/)
 })
 
 test('official chat routes use the access gate while custom chats stay available', async () => {

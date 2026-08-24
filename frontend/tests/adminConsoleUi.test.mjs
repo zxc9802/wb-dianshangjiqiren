@@ -39,6 +39,7 @@ test('permission editor pins account and group assignment above categorized bot 
   assert.match(page, /selectedMember\.account/)
   assert.match(page, /selectedMember\.groupName/)
   assert.match(page, /assignMemberGroup/)
+  assert.match(page, /智能体未开通/)
   assert.match(page, /分配组别/)
   assert.match(page, /保存权限/)
   assert.match(page, /恢复默认全部/)

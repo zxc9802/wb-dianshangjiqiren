@@ -574,7 +574,7 @@ export default function AdminConsolePage() {
                                         <strong>{selectedMember.account}</strong>
                                         <span>组别：{selectedMember.groupName || '未分配组别'}</span>
                                         <em>{selectedMember.isActive
-                                            ? `${savedMode === 'all' ? '智能体默认全部' : '智能体已配置'} · ${savedRoleMode === 'all' ? '岗位默认全部' : '岗位已配置'}`
+                                            ? `${savedMode === 'all' ? '智能体默认全部' : savedBotKeys.length === 0 ? '智能体未开通' : '智能体已配置'} · ${savedRoleMode === 'all' ? '岗位默认全部' : '岗位已配置'}`
                                             : '账号已停用'}</em>
                                     </div>
                                     <div className={styles.memberAccountBar}>

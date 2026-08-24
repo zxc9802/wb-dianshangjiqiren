@@ -44,6 +44,21 @@ test('admin access does not query a policy', async () => {
   assert.equal(calls.policyReads, 0)
 })
 
+test('new members can be given an empty allowlist without replacing an existing one', async () => {
+  const upserts = []
+  const { module } = await loadServerBotAccess({ policy: null })
+  await module.ensureEmptyBotAccessPolicy({
+    userBotAccessPolicy: {
+      upsert: async (args) => upserts.push(args),
+    },
+  }, 'member-1')
+  assert.deepEqual(upserts, [{
+    where: { userId: 'member-1' },
+    update: {},
+    create: { userId: 'member-1' },
+  }])
+})
+
 test('missing policy means all while present policy means selected', async () => {
   const missing = await loadServerBotAccess({ policy: null })
   assert.deepEqual(await missing.module.getUserBotAccessSummary('member-1', 'member'), { mode: 'all', botKeys: [] })
