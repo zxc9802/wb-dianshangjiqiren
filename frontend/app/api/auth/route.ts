@@ -10,6 +10,7 @@ import {
     ensureAccessControlBootstrap,
     revokeAuthSession,
 } from '../../lib/auth';
+import { findUserByLoginAccount } from '../../lib/server-account-lookup';
 import { getUserBotAccessSummary } from '../../lib/server-bot-access';
 
 const accountSchema = z.string().trim().min(1, 'Account is required.');
@@ -144,9 +145,7 @@ async function handleRegister(body: unknown) {
     const inviteCode = normalizeInviteCode(data.inviteCode);
 
     const user = await prisma.$transaction(async (tx) => {
-        const existing = await tx.user.findUnique({
-            where: { email: account },
-            select: {
+        const existing = await findUserByLoginAccount(tx, account, {
                 id: true,
                 email: true,
                 passwordHash: true,
@@ -157,8 +156,7 @@ async function handleRegister(body: unknown) {
                 accessGrantedAt: true,
                 authTokenVersion: true,
                 createdAt: true,
-            },
-        });
+            });
 
         if (existing) {
             if (existing.role !== 'admin' && !existing.accessGrantedAt) {
@@ -225,9 +223,7 @@ async function handleLogin(body: unknown) {
     const data = parseRequestBody(loginSchema, body);
     const account = normalizeAccount(data.account);
 
-    const user = await prisma.user.findUnique({
-        where: { email: account },
-        select: {
+    const user = await findUserByLoginAccount(prisma, account, {
             id: true,
             email: true,
             passwordHash: true,
@@ -239,8 +235,7 @@ async function handleLogin(body: unknown) {
             isActive: true,
             authTokenVersion: true,
             createdAt: true,
-        },
-    });
+        });
 
     if (!user) {
         throw new AppError('Account not found.', 404);
@@ -268,9 +263,7 @@ async function handleActivate(body: unknown) {
     const inviteCode = normalizeInviteCode(data.inviteCode);
 
     const user = await prisma.$transaction(async (tx) => {
-        const existing = await tx.user.findUnique({
-            where: { email: account },
-            select: {
+        const existing = await findUserByLoginAccount(tx, account, {
                 id: true,
                 email: true,
                 passwordHash: true,
@@ -282,8 +275,7 @@ async function handleActivate(body: unknown) {
                 isActive: true,
                 authTokenVersion: true,
                 createdAt: true,
-            },
-        });
+            });
 
         if (!existing) {
             throw new AppError('Account not found.', 404);

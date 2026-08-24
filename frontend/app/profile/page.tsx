@@ -41,7 +41,7 @@ export default function ProfilePage() {
             useAuthStore.setState({ user: nextUser });
             setNickname(nextUser.nickname);
             setIsEditing(false);
-            setFeedback({ type: 'success', message: '账号名称已保存。' });
+            setFeedback({ type: 'success', message: '账号名称已保存，请用新名称登录。' });
         } catch (error) {
             setFeedback({ type: 'error', message: error instanceof Error ? error.message : '账号名称保存失败。' });
         } finally {
@@ -90,7 +90,7 @@ export default function ProfilePage() {
                     <Settings size={20} />
                     账号设置
                 </h2>
-                <p className={styles.pageHint}>注册后可自行修改账号名称，仅用于展示，不影响登录账号。</p>
+                <p className={styles.pageHint}>注册后可自行修改账号名称。改完后请用新的账号名称登录，原账号将不能再登录。</p>
 
                 {feedback && (
                     <div className={feedback.type === 'success' ? styles.successText : styles.errorText}>
@@ -111,7 +111,6 @@ export default function ProfilePage() {
                                         setFeedback(null);
                                     }}
                                     placeholder="请输入账号名称"
-                                    maxLength={50}
                                     className={styles.editInput}
                                     disabled={isSaving}
                                 />

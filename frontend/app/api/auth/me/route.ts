@@ -1,11 +1,13 @@
 import { NextRequest } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../../lib/prisma';
 import { AppError, getAuthUser, errorResponse } from '../../../lib/auth';
+import { assertLoginAccountAvailable } from '../../../lib/server-account-lookup';
 import { getUserBotAccessSummary } from '../../../lib/server-bot-access';
 
 const updateProfileSchema = z.object({
-    nickname: z.string().trim().min(1, '请填写账号名称。').max(50, '账号名称过长。'),
+    nickname: z.string().trim().min(1, '请填写账号名称。'),
 });
 
 function serializeUser(user: {
@@ -46,10 +48,14 @@ export async function PATCH(req: NextRequest) {
         const user = await getAuthUser(req);
         const data = updateProfileSchema.parse(await req.json());
         const nextNickname = data.nickname.trim();
+        await assertLoginAccountAvailable(prisma, nextNickname, user.id);
 
         const updated = await prisma.user.update({
             where: { id: user.id },
-            data: { nickname: nextNickname },
+            data: {
+                email: nextNickname,
+                nickname: nextNickname,
+            },
             select: {
                 id: true,
                 email: true,
@@ -72,6 +78,9 @@ export async function PATCH(req: NextRequest) {
             data: { ...serializeUser(updated), botAccess },
         });
     } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+            return errorResponse(new AppError('该账号名称已被使用。', 409, 'ACCOUNT_EXISTS'));
+        }
         return errorResponse(err);
     }
 }
