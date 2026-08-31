@@ -39,6 +39,7 @@ model User {
   videoUploadJobs          VideoUploadJob[]
   botAccessPolicy          UserBotAccessPolicy?
   kbChatRolePolicy         UserKbChatRolePolicy?
+  modelAccessPolicies      UserModelAccessPolicy[]
 
   @@map("users")
 }
@@ -566,4 +567,32 @@ model UserKbChatRole {
   @@unique([policyId, roleKey])
   @@index([roleKey])
   @@map("user_kb_chat_roles")
+}
+
+model UserModelAccessPolicy {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  siteKey   String   @map("site_key")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions UserModelPermission[]
+
+  @@unique([userId, siteKey])
+  @@index([siteKey])
+  @@map("user_model_access_policies")
+}
+
+model UserModelPermission {
+  id        String   @id @default(uuid())
+  policyId  String   @map("policy_id")
+  modelKey  String   @map("model_key")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  policy UserModelAccessPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, modelKey])
+  @@index([modelKey])
+  @@map("user_model_permissions")
 }

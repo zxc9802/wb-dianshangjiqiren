@@ -12,6 +12,7 @@ import {
 } from '../../lib/auth';
 import { findUserByLoginAccount } from '../../lib/server-account-lookup';
 import { ensureEmptyBotAccessPolicy, getUserBotAccessSummary } from '../../lib/server-bot-access';
+import { getUserModelAccessSummary } from '../../lib/server-model-access';
 
 const accountSchema = z.string().trim().min(1, 'Account is required.');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters.');
@@ -94,6 +95,10 @@ type AuthPayloadUser = {
 type AuthTokenUser = AuthPayloadUser & { authTokenVersion: number };
 
 async function toUserPayload(user: AuthPayloadUser) {
+    const [botAccess, modelAccess] = await Promise.all([
+        getUserBotAccessSummary(user.id, user.role),
+        getUserModelAccessSummary(user.id, user.role),
+    ]);
     return {
         id: user.id,
         account: user.email,
@@ -101,7 +106,8 @@ async function toUserPayload(user: AuthPayloadUser) {
         groupName: user.groupName,
         avatar: user.avatar,
         role: user.role,
-        botAccess: await getUserBotAccessSummary(user.id, user.role),
+        botAccess,
+        modelAccess,
         ...(user.createdAt ? { createdAt: user.createdAt } : {}),
     };
 }

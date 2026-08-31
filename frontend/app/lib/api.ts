@@ -1,6 +1,7 @@
 import type { ResponseModel, WebSearchMode } from './chat-models';
 import type { BotAccessSummary } from './bot-access';
 import type { KbChatRoleAccessSummary } from './kb-chat-roles';
+import type { ModelAccessSummary } from './model-access';
 import type { OfficialBotCatalogEntry } from './bot-access-catalog';
 
 const API_BASE = '/api';
@@ -187,6 +188,17 @@ export const api = {
 
     resetAdminMemberKbChatRoles: (id: string) =>
         request<{ success: boolean; data: KbChatRoleAccessSummary }>(`/admin/members/${id}/kb-chat-roles`, {
+            method: 'DELETE',
+        }),
+
+    replaceAdminMemberModelAccess: (id: string, modelAccess: ModelAccessSummary) =>
+        request<{ success: boolean; data: ModelAccessSummary }>(`/admin/members/${id}/model-access`, {
+            method: 'PUT',
+            body: JSON.stringify(modelAccess),
+        }),
+
+    resetAdminMemberModelAccess: (id: string) =>
+        request<{ success: boolean; data: ModelAccessSummary }>(`/admin/members/${id}/model-access`, {
             method: 'DELETE',
         }),
 
@@ -425,6 +437,7 @@ export interface UserInfo {
     avatar: string;
     role: UserRole;
     botAccess: BotAccessSummary;
+    modelAccess: ModelAccessSummary;
     createdAt?: string;
 }
 
@@ -450,6 +463,7 @@ export interface AdminMemberInfo {
     isActive: boolean;
     botAccess: BotAccessSummary;
     kbChatRoles: KbChatRoleAccessSummary;
+    modelAccess: ModelAccessSummary;
 }
 
 export type UserRole = 'admin' | 'member';

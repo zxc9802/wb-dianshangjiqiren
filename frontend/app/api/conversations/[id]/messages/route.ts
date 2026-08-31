@@ -27,6 +27,7 @@ import {
     RESPONSE_MODEL_VALUES,
     WEB_SEARCH_MODE_VALUES,
 } from '../../../../lib/chat-models';
+import { getModelAccessSiteKeyForBot } from '../../../../lib/model-access';
 import {
     extractSuggestions as extractSharedSuggestions,
     stripSuggestionBlock as stripSharedSuggestionBlock,
@@ -37,6 +38,7 @@ import { buildConversationTitle, getConversationBotPayload } from '../../../../l
 import { assertConversationBotAccess } from '../../../../lib/server-bot-access';
 import { deleteTempVideo, downloadRemoteVideo, loadTempVideo } from '../../../../lib/server-chat-video';
 import { buildLongTermMemoryPrompt, rememberConversationTurn } from '../../../../lib/server-memory';
+import { assertUserCanUseModel } from '../../../../lib/server-model-access';
 import {
     GPT_5_4_MODEL,
     requestYunwuOpenAIChat,
@@ -591,6 +593,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             attachments: incomingAttachments,
             inlineVideoUploads,
         } = await parseMessageRequest(req);
+        const modelAccessSiteKey = bot.kind === 'builtin'
+            ? getModelAccessSiteKeyForBot(bot.routeId)
+            : null;
+        if (modelAccessSiteKey) {
+            await assertUserCanUseModel(userId, modelAccessSiteKey, responseModel);
+        }
 
         const normalizedAttachments = normalizeIncomingAttachments(incomingAttachments);
         let inlineVideoIndex = 0;

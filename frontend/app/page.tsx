@@ -25,6 +25,7 @@ import {
   type WebSearchMode,
 } from './lib/chat-models';
 import { putLaunchChatDraft } from './lib/launch-chat-drafts';
+import { canUseModel } from './lib/model-access';
 import { VIDEO_SITE_METADATA, type VideoSiteKey } from './lib/video-sites';
 import { startPcm16kMonoRecorder, type Pcm16Recorder } from './lib/pcmRecorder';
 import { api } from './lib/api';
@@ -338,6 +339,10 @@ export default function HomePage() {
   const [generalWebSearchMode, setGeneralWebSearchMode] = useState<WebSearchMode>(DEFAULT_WEB_SEARCH_MODE);
   const [isGeneralRecording, setIsGeneralRecording] = useState(false);
   const [isGeneralTranscribing, setIsGeneralTranscribing] = useState(false);
+  const allowedGeneralResponseModelOptions = useMemo(() => (
+    RESPONSE_MODEL_OPTIONS.filter((option) => canUseModel(user?.modelAccess, 'main-general', option.value))
+  ), [user?.modelAccess]);
+  const hasGeneralModelAccess = allowedGeneralResponseModelOptions.length > 0;
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const generalRecorderRef = useRef<Pcm16Recorder | null>(null);
@@ -362,6 +367,12 @@ export default function HomePage() {
     }
     setGeneralResponseModel(DEFAULT_RESPONSE_MODEL);
   }, []);
+  useEffect(() => {
+    const fallbackModel = allowedGeneralResponseModelOptions[0]?.value;
+    if (fallbackModel && !allowedGeneralResponseModelOptions.some((option) => option.value === generalResponseModel)) {
+      setGeneralResponseModel(fallbackModel);
+    }
+  }, [allowedGeneralResponseModelOptions, generalResponseModel]);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(`${RESPONSE_MODEL_STORAGE_PREFIX}${GENERIC_CHAT_BOT_ID}`, generalResponseModel);
@@ -415,6 +426,10 @@ export default function HomePage() {
 
   const openGenericChat = useCallback(async (draft?: string) => {
     if (!ensureAuthenticated()) return;
+    if (!hasGeneralModelAccess) {
+      alert('管理员暂未向当前账号开放通用聊天模型。');
+      return;
+    }
     let launchDraftId: string | null = null;
 
     if (generalAttachedFiles.length > 0) {
@@ -433,7 +448,7 @@ export default function HomePage() {
     setGeneralPrompt('');
     setGeneralAttachedFiles([]);
     router.push(buildGenericChatUrl(draft, launchDraftId));
-  }, [buildGenericChatUrl, ensureAuthenticated, generalAttachedFiles, router]);
+  }, [buildGenericChatUrl, ensureAuthenticated, generalAttachedFiles, hasGeneralModelAccess, router]);
 
   const submitGenericChat = useCallback(async () => {
     const text = generalPrompt.trim();
@@ -622,7 +637,8 @@ export default function HomePage() {
   );
 
   const canUseGenericChat = canAccessOfficialBot(user?.botAccess, GENERIC_CHAT_BOT_ID);
-  const canSubmitGeneralChat = generalPrompt.trim().length > 0 || generalAttachedFiles.length > 0;
+  const canSubmitGeneralChat = hasGeneralModelAccess
+    && (generalPrompt.trim().length > 0 || generalAttachedFiles.length > 0);
   const hasNoGrantedOfficialBots = Boolean(
     isAuthenticated && user?.botAccess?.mode === 'selected' && user.botAccess.botKeys.length === 0,
   );
@@ -782,10 +798,13 @@ export default function HomePage() {
                   }
                 }}
                 className={styles.generalComposerInput}
-                placeholder={isGeneralTranscribing
+                placeholder={!hasGeneralModelAccess
+                  ? '管理员暂未开放通用聊天模型'
+                  : isGeneralTranscribing
                   ? '语音转录中，请稍候...'
                   : '在这里输入任何问题...'}
                 rows={2}
+                disabled={!hasGeneralModelAccess}
               />
 
               {generalAttachedFiles.length > 0 && (
@@ -822,7 +841,7 @@ export default function HomePage() {
                     type="button"
                     className={styles.generalComposerUploadBtn}
                     onClick={() => generalFileInputRef.current?.click()}
-                    disabled={isGeneralRecording || isGeneralTranscribing}
+                    disabled={!hasGeneralModelAccess || isGeneralRecording || isGeneralTranscribing}
                   >
                     <Paperclip size={16} />
                     {generalAttachedFiles.length > 0
@@ -841,9 +860,11 @@ export default function HomePage() {
                           setGeneralResponseModel(event.target.value);
                         }
                       }}
-                      disabled={isGeneralRecording || isGeneralTranscribing}
+                      disabled={!hasGeneralModelAccess || isGeneralRecording || isGeneralTranscribing}
                     >
-                      {RESPONSE_MODEL_OPTIONS.map((option) => (
+                      {allowedGeneralResponseModelOptions.length === 0 ? (
+                        <option value={generalResponseModel}>管理员未开放模型</option>
+                      ) : allowedGeneralResponseModelOptions.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
@@ -876,7 +897,7 @@ export default function HomePage() {
                     type="button"
                     className={`${styles.generalComposerVoiceBtn} ${isGeneralRecording ? styles.generalComposerVoiceBtnActive : ''}`}
                     onClick={() => void toggleGeneralVoice()}
-                    disabled={isGeneralTranscribing}
+                    disabled={!hasGeneralModelAccess || isGeneralTranscribing}
                     title={isGeneralTranscribing ? '语音转录中...' : isGeneralRecording ? '停止录音' : '语音输入'}
                   >
                     {isGeneralTranscribing ? <Loader2 size={18} className="animate-spin" /> : <Mic size={18} />}
@@ -892,7 +913,7 @@ export default function HomePage() {
                       }
                       void openGenericChat();
                     }}
-                    disabled={isGeneralRecording || isGeneralTranscribing}
+                    disabled={!hasGeneralModelAccess || isGeneralRecording || isGeneralTranscribing}
                   >
                     <Send size={18} />
                   </button>

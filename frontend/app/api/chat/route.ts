@@ -11,6 +11,7 @@ import {
     type ResponseModel,
     type WebSearchMode,
 } from '../../lib/chat-models';
+import { getModelAccessSiteKeyForBot } from '../../lib/model-access';
 import { streamGeminiDeepThinkingChat } from '../../lib/gemini-deep-chat';
 import { getSystemPromptByBotId } from '../../lib/server-bot-prompts';
 import { readBackendUrl } from '../../lib/server-env';
@@ -19,6 +20,7 @@ import { streamYunwuClaudeChat } from '../../lib/yunwu-claude-chat';
 import { streamYunwuOpenAIChat, type OpenAIChatMessage } from '../../lib/yunwu-openai-chat';
 import { enrichSystemPromptWithWebSearch } from '../../lib/web-search';
 import { assertUserCanAccessOfficialBot } from '../../lib/server-bot-access';
+import { assertUserCanUseModel } from '../../lib/server-model-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -183,6 +185,10 @@ export async function POST(req: NextRequest) {
             await assertUserCanAccessOfficialBot(user.id, accessBotKey, user.role);
         }
         const responseModel = isResponseModel(body.responseModel) ? body.responseModel : DEFAULT_RESPONSE_MODEL;
+        const modelAccessSiteKey = getModelAccessSiteKeyForBot(botIdString || GENERIC_CHAT_BOT_ID);
+        if (modelAccessSiteKey) {
+            await assertUserCanUseModel(user.id, modelAccessSiteKey, responseModel, user.role);
+        }
         const webSearchMode = isWebSearchMode(body.webSearchMode) ? body.webSearchMode : DEFAULT_WEB_SEARCH_MODE;
         const normalizedMessages = normalizeMessages(body.messages, body.conversationHistory, body.message);
         const builtinFallbackPrompt = BUILTIN_BOT_MAP[botIdString]?.systemPromptFallback;

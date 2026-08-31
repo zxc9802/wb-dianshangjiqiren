@@ -33,6 +33,7 @@ test('homepage filters official cards and generic chat by member access', async 
   assert.match(home, /findDeniedBotKeys/)
   assert.match(home, /hasNoGrantedOfficialBots/)
   assert.match(home, /管理员尚未开通智能体权限/)
+  assert.match(home, /canUseModel\(user\?\.modelAccess, 'main-general', option\.value\)/)
 })
 
 test('registration starts members with no official bot access', async () => {
@@ -58,6 +59,7 @@ test('server entry points check access before parsing or side effects', async ()
   const messages = await readFile(path.join(appRoot, 'api', 'conversations', '[id]', 'messages', 'route.ts'), 'utf8')
   const messagePost = messages.slice(messages.indexOf('export async function POST'))
   assertBefore(messagePost, 'assertConversationBotAccess', 'parseMessageRequest(req)', 'messages')
+  assertBefore(messagePost, 'assertUserCanUseModel', 'normalizeIncomingAttachments', 'message model access')
 
   const imageProxy = await readFile(path.join(appRoot, 'api', 'image-generations', 'proxy.ts'), 'utf8')
   const imageGenerate = imageProxy.slice(imageProxy.indexOf('export async function proxyGenerateImageRequest'))
@@ -88,6 +90,7 @@ test('legacy direct chat and saved workflows cannot bypass access', async () => 
   const directPost = directChat.slice(directChat.indexOf('export async function POST'))
   assertBefore(directPost, 'getAuthUser(req)', 'await req.json()', 'direct chat authentication')
   assertBefore(directPost, 'assertUserCanAccessOfficialBot', 'streamByResponseModel(', 'direct chat authorization')
+  assertBefore(directPost, 'assertUserCanUseModel', 'streamByResponseModel(', 'direct chat model authorization')
   assert.match(directPost, /botIdString \|\| GENERIC_CHAT_BOT_ID/)
 
   const workflowRoute = await readFile(path.join(appRoot, 'api', 'workflows', '[id]', 'route.ts'), 'utf8')

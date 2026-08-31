@@ -31,6 +31,7 @@ import {
     type ResponseModel,
     type WebSearchMode,
 } from '../../lib/chat-models';
+import { canUseModel, getModelAccessSiteKeyForBot } from '../../lib/model-access';
 import {
     getLocalConversationVideo,
     listLocalConversationVideos,
@@ -1142,6 +1143,13 @@ function ChatPageContent() {
     const [isGeneratingReport, setIsGeneratingReport] = useState(false);
     const [adminPanelOpen, setAdminPanelOpen] = useState(false);
     const { user } = useAuthStore();
+    const modelAccessSiteKey = getModelAccessSiteKeyForBot(botId);
+    const allowedResponseModelOptions = useMemo(() => (
+        modelAccessSiteKey
+            ? RESPONSE_MODEL_OPTIONS.filter((option) => canUseModel(user?.modelAccess, modelAccessSiteKey, option.value))
+            : RESPONSE_MODEL_OPTIONS
+    ), [modelAccessSiteKey, user?.modelAccess]);
+    const hasResponseModelAccess = allowedResponseModelOptions.length > 0;
     const isAdmin = user?.role === 'admin';
     const adminBotKind: 'builtin' | 'custom' = botId.startsWith('custom-') ? 'custom' : 'builtin';
     const canUseVideoBreakdownAttachments = isVideoBreakdownBot && !imageModeEnabled;
@@ -1249,6 +1257,13 @@ function ChatPageContent() {
         }
         setResponseModel(DEFAULT_RESPONSE_MODEL);
     }, [botId, requestedResponseModel]);
+
+    useEffect(() => {
+        const fallbackModel = allowedResponseModelOptions[0]?.value;
+        if (fallbackModel && !allowedResponseModelOptions.some((option) => option.value === responseModel)) {
+            setResponseModel(fallbackModel);
+        }
+    }, [allowedResponseModelOptions, responseModel]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -1796,6 +1811,7 @@ function ChatPageContent() {
     };
 
     const sendMessage = useCallback(async (rawText: string, options?: { allowTextFallback?: boolean }) => {
+        if (!hasResponseModelAccess) return;
         const isImageRequest = imageModeEnabled;
         const hasFiles = !isImageRequest && attachedFiles.length > 0;
         const hasManualHistoryVideos = !isImageRequest
@@ -2289,6 +2305,7 @@ function ChatPageContent() {
         createConversation,
         ensureConversationScope,
         flushStreamingText,
+        hasResponseModelAccess,
         imageModeEnabled,
         isStreaming,
         isUploading,
@@ -2887,9 +2904,11 @@ function ChatPageContent() {
                                         setResponseModel(event.target.value);
                                     }
                                 }}
-                                disabled={isStreaming || isUploading || isTranscribing}
+                                disabled={!hasResponseModelAccess || isStreaming || isUploading || isTranscribing}
                             >
-                                {RESPONSE_MODEL_OPTIONS.map((option) => (
+                                {allowedResponseModelOptions.length === 0 ? (
+                                    <option value={responseModel}>管理员未开放模型</option>
+                                ) : allowedResponseModelOptions.map((option) => (
                                     <option key={option.value} value={option.value}>
                                         {option.label}
                                     </option>
@@ -3045,12 +3064,12 @@ function ChatPageContent() {
                                 : '输入消息...'}
                         className={styles.textInput}
                         rows={1}
-                        disabled={isStreaming || isUploading}
+                        disabled={!hasResponseModelAccess || isStreaming || isUploading}
                     />
                     <button
                         onClick={() => void sendMessage(inputText)}
                         className={styles.sendBtn}
-                        disabled={(!inputText.trim() && attachedFiles.length === 0 && !(isVideoBreakdownBot && selectedConversationVideoIds.length > 0)) || isStreaming || isTranscribing || isUploading}
+                        disabled={!hasResponseModelAccess || (!inputText.trim() && attachedFiles.length === 0 && !(isVideoBreakdownBot && selectedConversationVideoIds.length > 0)) || isStreaming || isTranscribing || isUploading}
                     >
                         {imageModeEnabled ? <ImageIcon size={18} /> : <Send size={18} />}
                     </button>

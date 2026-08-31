@@ -8,6 +8,7 @@ const testsRoot = path.dirname(fileURLToPath(import.meta.url))
 const appRoot = path.join(testsRoot, '..', 'app')
 const homePath = path.join(appRoot, 'page.tsx')
 const adminPagePath = path.join(appRoot, 'admin', 'page.tsx')
+const modelAccessPath = path.join(appRoot, 'lib', 'model-access.ts')
 
 test('home exposes separate admin and invite-code links only in the admin guard', async () => {
   const home = await readFile(homePath, 'utf8')
@@ -32,6 +33,18 @@ test('permission editor includes knowledge-base role checkboxes for each member'
   assert.match(page, /resetAdminMemberKbChatRoles/)
   assert.match(page, /恢复默认全部岗位/)
   assert.match(page, /KB_CHAT_ROLES/)
+})
+
+test('permission editor manages model allowlists for all four entries', async () => {
+  const page = await readFile(adminPagePath, 'utf8')
+  const modelAccess = await readFile(modelAccessPath, 'utf8')
+  assert.match(page, /MODEL_ACCESS_SITES/)
+  assert.match(page, /replaceAdminMemberModelAccess/)
+  assert.match(modelAccess, /主站通用输入框/)
+  assert.match(modelAccess, /起芽成长特助/)
+  assert.match(modelAccess, /视频拆解导演/)
+  assert.match(modelAccess, /起芽知识库机器人/)
+  assert.match(page, /自定义白名单/)
 })
 
 test('permission editor pins account and group assignment above categorized bot checkboxes', async () => {

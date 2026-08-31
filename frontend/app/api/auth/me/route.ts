@@ -5,6 +5,7 @@ import { prisma } from '../../../lib/prisma';
 import { AppError, getAuthUser, errorResponse } from '../../../lib/auth';
 import { assertLoginAccountAvailable } from '../../../lib/server-account-lookup';
 import { getUserBotAccessSummary } from '../../../lib/server-bot-access';
+import { getUserModelAccessSummary } from '../../../lib/server-model-access';
 
 const updateProfileSchema = z.object({
     account: z.string().trim().min(1, '请填写账号。'),
@@ -33,10 +34,13 @@ function serializeUser(user: {
 export async function GET(req: NextRequest) {
     try {
         const user = await getAuthUser(req);
-        const botAccess = await getUserBotAccessSummary(user.id, user.role);
+        const [botAccess, modelAccess] = await Promise.all([
+            getUserBotAccessSummary(user.id, user.role),
+            getUserModelAccessSummary(user.id, user.role),
+        ]);
         return Response.json({
             success: true,
-            data: { ...serializeUser(user), botAccess },
+            data: { ...serializeUser(user), botAccess, modelAccess },
         });
     } catch (err) {
         return errorResponse(err);
@@ -71,11 +75,14 @@ export async function PATCH(req: NextRequest) {
             throw new AppError('Account not found.', 404);
         }
 
-        const botAccess = await getUserBotAccessSummary(updated.id, updated.role);
+        const [botAccess, modelAccess] = await Promise.all([
+            getUserBotAccessSummary(updated.id, updated.role),
+            getUserModelAccessSummary(updated.id, updated.role),
+        ]);
 
         return Response.json({
             success: true,
-            data: { ...serializeUser(updated), botAccess },
+            data: { ...serializeUser(updated), botAccess, modelAccess },
         });
     } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {

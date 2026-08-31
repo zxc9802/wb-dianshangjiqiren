@@ -11,6 +11,13 @@ import {
 import type { BotAccessSummary } from '../lib/bot-access';
 import type { OfficialBotCatalogEntry } from '../lib/bot-access-catalog';
 import { KB_CHAT_ROLES, type KbChatRoleAccessSummary } from '../lib/kb-chat-roles';
+import {
+    MODEL_ACCESS_SITES,
+    getModelAccessSiteSummary,
+    parseModelAccessSummary,
+    type ModelAccessSiteKey,
+    type ModelAccessSummary,
+} from '../lib/model-access';
 import { useAuthStore } from '../stores/auth';
 import styles from './admin.module.css';
 
@@ -25,6 +32,16 @@ function sameKeys(left: string[], right: string[]): boolean {
     const sortedRight = sortedKeys(right);
     return sortedLeft.length === sortedRight.length
         && sortedLeft.every((key, index) => key === sortedRight[index]);
+}
+
+function normalizedModelAccess(summary: ModelAccessSummary): string {
+    return JSON.stringify(summary.sites
+        .map((site) => ({ ...site, modelKeys: sortedKeys(site.modelKeys) }))
+        .sort((left, right) => left.siteKey.localeCompare(right.siteKey)));
+}
+
+function sameModelAccess(left: ModelAccessSummary, right: ModelAccessSummary): boolean {
+    return normalizedModelAccess(left) === normalizedModelAccess(right);
 }
 
 export default function AdminConsolePage() {
@@ -43,6 +60,8 @@ export default function AdminConsolePage() {
     const [draftRoleKeys, setDraftRoleKeys] = useState<string[]>([]);
     const [savedRoleKeys, setSavedRoleKeys] = useState<string[]>([]);
     const [savedRoleMode, setSavedRoleMode] = useState<'all' | 'selected'>('all');
+    const [draftModelAccess, setDraftModelAccess] = useState<ModelAccessSummary>({ sites: [] });
+    const [savedModelAccess, setSavedModelAccess] = useState<ModelAccessSummary>({ sites: [] });
     const [groupDraft, setGroupDraft] = useState('');
     const [loadingOptions, setLoadingOptions] = useState(false);
     const [loadingAccess, setLoadingAccess] = useState(false);
@@ -102,6 +121,9 @@ export default function AdminConsolePage() {
         setDraftRoleKeys(effectiveRoleKeys);
         setSavedRoleKeys(effectiveRoleKeys);
         setSavedRoleMode(member.kbChatRoles.mode);
+        const modelAccess = parseModelAccessSummary(member.modelAccess);
+        setDraftModelAccess(modelAccess);
+        setSavedModelAccess(modelAccess);
     }, []);
 
     const loadAccessData = useCallback(async () => {
@@ -129,6 +151,8 @@ export default function AdminConsolePage() {
                 setDraftRoleKeys([]);
                 setSavedRoleKeys([]);
                 setSavedRoleMode('all');
+                setDraftModelAccess({ sites: [] });
+                setSavedModelAccess({ sites: [] });
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : '加载成员权限失败。');
@@ -148,7 +172,8 @@ export default function AdminConsolePage() {
     const allRoleKeys = useMemo(() => KB_CHAT_ROLES.map((role) => role.roleKey), []);
     const isBotDirty = !sameKeys(draftBotKeys, savedBotKeys);
     const isRoleDirty = !sameKeys(draftRoleKeys, savedRoleKeys);
-    const isDirty = isBotDirty || isRoleDirty;
+    const isModelDirty = !sameModelAccess(draftModelAccess, savedModelAccess);
+    const isDirty = isBotDirty || isRoleDirty || isModelDirty;
 
     const normalizedMemberSearch = memberSearch.trim().toLowerCase();
     const visibleMembers = members.filter((member) => showDisabledMembers || member.isActive !== false);
@@ -292,6 +317,15 @@ export default function AdminConsolePage() {
         setSavedRoleMode(access.mode);
     }
 
+    function applyMemberModelAccess(memberId: string, access: ModelAccessSummary) {
+        const normalized = parseModelAccessSummary(access);
+        setMembers((current) => current.map((member) => (
+            member.id === memberId ? { ...member, modelAccess: normalized } : member
+        )));
+        setDraftModelAccess(normalized);
+        setSavedModelAccess(normalized);
+    }
+
     async function saveAccess() {
         if (!selectedMember || saving || !isDirty || !selectedMember.isActive) return;
         setSaving(true);
@@ -305,6 +339,10 @@ export default function AdminConsolePage() {
             if (isRoleDirty) {
                 const response = await api.replaceAdminMemberKbChatRoles(selectedMember.id, draftRoleKeys);
                 applyMemberKbChatRoles(selectedMember.id, response.data);
+            }
+            if (isModelDirty) {
+                const response = await api.replaceAdminMemberModelAccess(selectedMember.id, draftModelAccess);
+                applyMemberModelAccess(selectedMember.id, response.data);
             }
             setStatus(`已保存 ${selectedMember.account} 的权限。`);
         } catch (err) {
@@ -401,6 +439,34 @@ export default function AdminConsolePage() {
             : [...current, roleKey]);
     }
 
+    function replaceDraftSiteModels(siteKey: ModelAccessSiteKey, modelKeys: string[]) {
+        setDraftModelAccess((current) => ({
+            sites: [
+                ...current.sites.filter((site) => site.siteKey !== siteKey),
+                { siteKey, mode: 'selected', modelKeys },
+            ],
+        }));
+    }
+
+    function resetDraftSiteModels(siteKey: ModelAccessSiteKey) {
+        setDraftModelAccess((current) => ({
+            sites: current.sites.filter((site) => site.siteKey !== siteKey),
+        }));
+    }
+
+    function toggleSiteModel(siteKey: ModelAccessSiteKey, modelKey: string) {
+        const site = MODEL_ACCESS_SITES.find((item) => item.siteKey === siteKey);
+        if (!site) return;
+        const policy = getModelAccessSiteSummary(draftModelAccess, siteKey);
+        const currentKeys = policy?.modelKeys || site.models.map((model) => model.modelKey);
+        replaceDraftSiteModels(
+            siteKey,
+            currentKeys.includes(modelKey)
+                ? currentKeys.filter((key) => key !== modelKey)
+                : [...currentKeys, modelKey],
+        );
+    }
+
     function renderGroupSection() {
         const items = options.filter((item) => item.kind === 'group');
         return (
@@ -478,7 +544,7 @@ export default function AdminConsolePage() {
                     </button>
                     <p className={styles.eyebrow}>ADMIN CONTROL</p>
                     <h1>管理员后台</h1>
-                    <p className={styles.subtitle}>维护组别并分配给成员账号，同时按成员控制官方智能体和起芽知识库岗位。</p>
+                    <p className={styles.subtitle}>维护组别并分配给成员账号，同时按成员控制智能体、知识库岗位和四个入口的可用模型。</p>
                 </div>
                 <button type="button" className={styles.inviteButton} onClick={() => router.push('/admin/invite-codes')}>
                     <KeyRound size={17} />
@@ -526,7 +592,7 @@ export default function AdminConsolePage() {
                     <div className={styles.sectionIntro}>
                         <div>
                             <h2>成员智能体权限</h2>
-                            <p>未单独配置的成员默认可用全部官方智能体和知识库岗位。可在这里给每个账号分配组别。停用或删除账号后，该成员不会出现在权限设置中，也无法登录。</p>
+                            <p>未单独配置的成员默认可用全部官方智能体、知识库岗位和模型。可在这里按成员分别限制四个入口的模型。</p>
                         </div>
                         <button type="button" className={styles.actionButton} onClick={() => void loadAccessData()} disabled={loadingAccess}>
                             <RefreshCw size={16} className={loadingAccess ? styles.spinning : ''} /> 刷新
@@ -574,7 +640,7 @@ export default function AdminConsolePage() {
                                         <strong>{selectedMember.account}</strong>
                                         <span>组别：{selectedMember.groupName || '未分配组别'}</span>
                                         <em>{selectedMember.isActive
-                                            ? `${savedMode === 'all' ? '智能体默认全部' : savedBotKeys.length === 0 ? '智能体未开通' : '智能体已配置'} · ${savedRoleMode === 'all' ? '岗位默认全部' : '岗位已配置'}`
+                                            ? `${savedMode === 'all' ? '智能体默认全部' : savedBotKeys.length === 0 ? '智能体未开通' : '智能体已配置'} · ${savedRoleMode === 'all' ? '岗位默认全部' : '岗位已配置'} · ${savedModelAccess.sites.length === 0 ? '模型默认全部' : '模型已配置'}`
                                             : '账号已停用'}</em>
                                     </div>
                                     <div className={styles.memberAccountBar}>
@@ -668,6 +734,59 @@ export default function AdminConsolePage() {
                                                 ))}
                                             </div>
                                         </fieldset>
+                                        {MODEL_ACCESS_SITES.map((site) => {
+                                            const policy = getModelAccessSiteSummary(draftModelAccess, site.siteKey);
+                                            const selectedKeys = policy?.modelKeys || site.models.map((model) => model.modelKey);
+                                            return (
+                                                <fieldset className={styles.botGroup} key={site.siteKey}>
+                                                    <legend>{site.name}模型</legend>
+                                                    <p className={styles.roleHint}>
+                                                        {site.description} 当前：{policy ? '自定义白名单' : '默认全部可用'}。
+                                                    </p>
+                                                    <div className={styles.permissionToolbar}>
+                                                        <span>已选 {selectedKeys.length} / {site.models.length}</span>
+                                                        <div>
+                                                            <button
+                                                                type="button"
+                                                                className={styles.textButton}
+                                                                onClick={() => replaceDraftSiteModels(site.siteKey, site.models.map((model) => model.modelKey))}
+                                                            >
+                                                                全选
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className={styles.textButton}
+                                                                onClick={() => replaceDraftSiteModels(site.siteKey, [])}
+                                                            >
+                                                                清空
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className={styles.textButton}
+                                                                onClick={() => resetDraftSiteModels(site.siteKey)}
+                                                            >
+                                                                恢复默认全部
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div className={styles.botGrid}>
+                                                        {site.models.map((model) => (
+                                                            <label className={styles.botOption} key={model.modelKey}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedKeys.includes(model.modelKey)}
+                                                                    onChange={() => toggleSiteModel(site.siteKey, model.modelKey)}
+                                                                />
+                                                                <span>
+                                                                    <strong>{model.label}</strong>
+                                                                    <small>{model.modelKey}</small>
+                                                                </span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </fieldset>
+                                            );
+                                        })}
                                     </div>
                                     <div className={styles.saveBar}>
                                         <span>{isDirty ? '有尚未保存的权限调整' : '权限已保存'}</span>

@@ -3,6 +3,7 @@ import { AppError, assertMemberAccountEnabled } from './auth';
 import { prisma } from './prisma';
 import { readServerEnv } from './server-env';
 import { KB_CHAT_SITE_METADATA } from './kb-chat-site';
+import { ensureModelAccessTables } from './server-model-access';
 import {
     ensureVideoSsoTicketTable,
     getMainAppUrl,
@@ -90,6 +91,7 @@ export async function createKbChatSsoTicket(userId: string, redirectPath: string
 
 export async function consumeKbChatSsoTicket(ticketId: string) {
     await ensureVideoSsoTicketTable();
+    await ensureModelAccessTables();
 
     return prisma.$transaction(async (tx) => {
         const ticket = await tx.videoSsoTicket.findUnique({
@@ -131,6 +133,16 @@ export async function consumeKbChatSsoTicket(ticketId: string) {
                     select: {
                         permissions: {
                             select: { roleKey: true },
+                            orderBy: { createdAt: 'asc' },
+                        },
+                    },
+                },
+                modelAccessPolicies: {
+                    where: { siteKey: 'kb-chat' },
+                    select: {
+                        siteKey: true,
+                        permissions: {
+                            select: { modelKey: true },
                             orderBy: { createdAt: 'asc' },
                         },
                     },
@@ -178,6 +190,15 @@ export async function consumeKbChatSsoTicket(ticketId: string) {
                         mode: 'selected' as const,
                         roleKeys: user.kbChatRolePolicy.permissions.map((item) => item.roleKey),
                     },
+                modelAccess: {
+                    sites: user.role === 'admin'
+                        ? []
+                        : user.modelAccessPolicies.map((policy) => ({
+                            siteKey: 'kb-chat' as const,
+                            mode: 'selected' as const,
+                            modelKeys: policy.permissions.map((item) => item.modelKey),
+                        })),
+                },
             },
         };
     });

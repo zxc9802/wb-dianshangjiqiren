@@ -2,7 +2,12 @@ import { AppError } from './auth';
 import type { BotAccessSummary } from './bot-access';
 import { isOfficialBotKey } from './bot-access-catalog';
 import { isKbChatRoleKey, type KbChatRoleAccessSummary } from './kb-chat-roles';
+import { parseModelAccessSummary, type ModelAccessSummary } from './model-access';
 import { prisma } from './prisma';
+import {
+    ensureModelAccessTables,
+    normalizeSelectedModelAccessSites,
+} from './server-model-access';
 import { assertActiveGroupOption } from './server-registration-options';
 
 const MEMBER_DELETE_TRANSACTION_OPTIONS = {
@@ -18,6 +23,7 @@ export interface AdminMemberInfo {
     isActive: boolean;
     botAccess: BotAccessSummary;
     kbChatRoles: KbChatRoleAccessSummary;
+    modelAccess: ModelAccessSummary;
 }
 
 async function loadNonAdminMember(tx: any, userId: string) {
@@ -43,6 +49,7 @@ async function requireConfigurableMember(tx: any, userId: string) {
 }
 
 export async function listAdminMembers(): Promise<AdminMemberInfo[]> {
+    await ensureModelAccessTables();
     const members = await prisma.user.findMany({
         where: { role: { not: 'admin' } },
         select: {
@@ -67,6 +74,16 @@ export async function listAdminMembers(): Promise<AdminMemberInfo[]> {
                     },
                 },
             },
+            modelAccessPolicies: {
+                select: {
+                    siteKey: true,
+                    permissions: {
+                        select: { modelKey: true },
+                        orderBy: { createdAt: 'asc' },
+                    },
+                },
+                orderBy: { createdAt: 'asc' },
+            },
         },
         orderBy: [{ createdAt: 'asc' }, { email: 'asc' }],
     });
@@ -83,6 +100,15 @@ export async function listAdminMembers(): Promise<AdminMemberInfo[]> {
         kbChatRoles: member.kbChatRolePolicy
             ? { mode: 'selected' as const, roleKeys: member.kbChatRolePolicy.permissions.map((item) => item.roleKey) }
             : { mode: 'all' as const, roleKeys: [] },
+        modelAccess: {
+            ...parseModelAccessSummary({
+                sites: member.modelAccessPolicies.map((policy) => ({
+                    siteKey: policy.siteKey,
+                    mode: 'selected',
+                    modelKeys: policy.permissions.map((item) => item.modelKey),
+                })),
+            }),
+        },
     }));
 }
 
@@ -225,4 +251,38 @@ export async function resetMemberKbChatRoles(userId: string): Promise<KbChatRole
     });
 
     return { mode: 'all', roleKeys: [] };
+}
+
+export async function replaceMemberModelAccess(userId: string, value: unknown): Promise<ModelAccessSummary> {
+    const sites = normalizeSelectedModelAccessSites(value);
+    await ensureModelAccessTables();
+
+    await prisma.$transaction(async (tx) => {
+        await requireConfigurableMember(tx, userId);
+        await tx.userModelAccessPolicy.deleteMany({ where: { userId } });
+
+        for (const site of sites) {
+            const policy = await tx.userModelAccessPolicy.create({
+                data: { userId, siteKey: site.siteKey },
+                select: { id: true },
+            });
+            if (site.modelKeys.length > 0) {
+                await tx.userModelPermission.createMany({
+                    data: site.modelKeys.map((modelKey) => ({ policyId: policy.id, modelKey })),
+                });
+            }
+        }
+    });
+
+    return { sites };
+}
+
+export async function resetMemberModelAccess(userId: string): Promise<ModelAccessSummary> {
+    await ensureModelAccessTables();
+    await prisma.$transaction(async (tx) => {
+        await requireConfigurableMember(tx, userId);
+        await tx.userModelAccessPolicy.deleteMany({ where: { userId } });
+    });
+
+    return { sites: [] };
 }

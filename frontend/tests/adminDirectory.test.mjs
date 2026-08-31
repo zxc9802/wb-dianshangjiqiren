@@ -21,7 +21,12 @@ async function loadService(prisma, groupAssert) {
     './auth': { AppError: TestAppError },
     './bot-access-catalog': { isOfficialBotKey: (key) => ['1', '2', '3'].includes(key) },
     './kb-chat-roles': { isKbChatRoleKey: (key) => ['operation', 'product', 'new'].includes(key) },
+    './model-access': { parseModelAccessSummary: (value) => value },
     './prisma': { prisma },
+    './server-model-access': {
+      ensureModelAccessTables: async () => undefined,
+      normalizeSelectedModelAccessSites: (value) => value,
+    },
     './server-registration-options': {
       assertActiveGroupOption: groupAssert || (async (_client, groupName) => {
         if (groupName && groupName !== '运营组' && groupName !== '技术组') {
@@ -39,6 +44,10 @@ test('member rows include account name group and policy state', async () => {
         id: 'member-1', email: 'a001', nickname: '张三', groupName: '运营组',
         botAccessPolicy: { permissions: [{ botKey: '1' }, { botKey: '3' }] },
         kbChatRolePolicy: { permissions: [{ roleKey: 'operation' }] },
+        modelAccessPolicies: [{
+          siteKey: 'main-general',
+          permissions: [{ modelKey: 'gpt-5.4' }],
+        }],
       }],
     },
   }
@@ -48,6 +57,9 @@ test('member rows include account name group and policy state', async () => {
     isActive: true,
     botAccess: { mode: 'selected', botKeys: ['1', '3'] },
     kbChatRoles: { mode: 'selected', roleKeys: ['operation'] },
+    modelAccess: {
+      sites: [{ siteKey: 'main-general', mode: 'selected', modelKeys: ['gpt-5.4'] }],
+    },
   }])
 })
 
@@ -86,6 +98,30 @@ test('saving kb chat roles atomically replaces the member allowlist', async () =
     roleKeys: ['operation'],
   })
   assert.deepEqual(transactionOrder, ['validate-user', 'upsert-policy', 'delete-old', 'create-new'])
+})
+
+test('saving model access atomically replaces per-site policies', async () => {
+  const transactionOrder = []
+  const tx = {
+    user: { findUnique: async () => (transactionOrder.push('validate-user'), { role: 'member', isActive: true }) },
+    userModelAccessPolicy: {
+      deleteMany: async () => (transactionOrder.push('delete-policies'), { count: 1 }),
+      create: async () => (transactionOrder.push('create-policy'), { id: 'model-policy-1' }),
+    },
+    userModelPermission: {
+      createMany: async () => (transactionOrder.push('create-models'), { count: 1 }),
+    },
+  }
+  const service = await loadService({ $transaction: async (callback) => callback(tx) })
+  const result = await service.replaceMemberModelAccess('member-1', [{
+    siteKey: 'main-general',
+    mode: 'selected',
+    modelKeys: ['gpt-5.4'],
+  }])
+  assert.deepEqual(result, {
+    sites: [{ siteKey: 'main-general', mode: 'selected', modelKeys: ['gpt-5.4'] }],
+  })
+  assert.deepEqual(transactionOrder, ['validate-user', 'delete-policies', 'create-policy', 'create-models'])
 })
 
 test('admins cannot be restricted and unknown keys are rejected', async () => {
