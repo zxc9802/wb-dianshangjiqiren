@@ -23,6 +23,7 @@ import { VIDEO_BREAKDOWN_BOT_ID } from '../../../../lib/builtin-bots';
 import {
     DEFAULT_RESPONSE_MODEL,
     DEFAULT_WEB_SEARCH_MODE,
+    getOpenAIUpstreamModel,
     RESPONSE_MODEL_VALUES,
     WEB_SEARCH_MODE_VALUES,
 } from '../../../../lib/chat-models';
@@ -790,7 +791,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             }));
 
         const shouldSetInitialTitle = !hasPreviousUserMessage;
-        const shouldStreamOpenAI = inputType !== 'image' && responseModel === 'gpt-5.4';
+        const openAIUpstreamModel = getOpenAIUpstreamModel(responseModel);
+        const shouldStreamOpenAI = inputType !== 'image' && Boolean(openAIUpstreamModel);
         const shouldStreamClaude = inputType !== 'image' && responseModel === 'claude-opus-4.6';
         const shouldStreamVideoBreakdownGpt = shouldStreamOpenAI
             && bot.kind === 'builtin'
@@ -1031,6 +1033,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                             messages: textModelMessages,
                             temperature: 0.8,
                             maxTokens: 8192,
+                            model: openAIUpstreamModel || undefined,
                             onText: (textChunk) => {
                                 if (!textChunk) {
                                     return;

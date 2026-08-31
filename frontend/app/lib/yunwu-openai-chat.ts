@@ -7,9 +7,9 @@ import {
     truncateForLog,
 } from './upstream-error';
 
-const DEFAULT_OPENAI_CHAT_URL = 'https://yunwu.ai/v1/chat/completions';
+const DEFAULT_OPENAI_CHAT_URL = 'https://api.openlux.ai/v1/responses';
 export const GPT_5_4_MODEL = 'gpt-5.4';
-const DEFAULT_OPENAI_CHAT_MODEL = GPT_5_4_MODEL;
+const DEFAULT_OPENAI_CHAT_MODEL = 'gpt-5.5';
 
 export type OpenAIContentPart =
     | { type: 'text'; text: string }
@@ -41,6 +41,15 @@ type OpenAIResponsePayload = {
     choices?: Array<{
         delta?: { content?: unknown };
         message?: { content?: unknown };
+    }>;
+};
+
+type OpenAIResponsesPayload = {
+    output_text?: string;
+    output?: Array<{
+        content?: Array<{
+            text?: string;
+        }>;
     }>;
 };
 
@@ -85,7 +94,8 @@ export function getYunwuOpenAIChatConfig(): {
     model: string;
 } {
     const apiKey = (
-        readServerEnv('YUNWU_OPENAI_CHAT_API_KEY')
+        readServerEnv('OPENLUX_API_KEY')
+        || readServerEnv('YUNWU_OPENAI_CHAT_API_KEY')
         || readServerEnv('YUNWU_OPENAI_API_KEY')
         || readServerEnv('YUNWU_CHAT_API_KEY')
         || readServerEnv('AI_API_KEY')
@@ -94,9 +104,13 @@ export function getYunwuOpenAIChatConfig(): {
         throw new AppError('Missing chat API key configuration', 500);
     }
 
+    const openLuxBaseUrl = (readServerEnv('OPENLUX_API_BASE_URL') || '').trim().replace(/\/+$/, '');
     const apiUrl = (
         readServerEnv('YUNWU_OPENAI_CHAT_URL')
         || readServerEnv('YUNWU_OPENAI_API_URL')
+        || (openLuxBaseUrl
+            ? `${openLuxBaseUrl.endsWith('/v1') ? openLuxBaseUrl : `${openLuxBaseUrl}/v1`}/responses`
+            : '')
         || DEFAULT_OPENAI_CHAT_URL
     ).trim();
     const model = (
@@ -146,6 +160,49 @@ function buildRequestBody(
     };
 }
 
+function isResponsesApiUrl(apiUrl: string): boolean {
+    try {
+        return new URL(apiUrl).pathname.replace(/\/+$/, '').endsWith('/responses');
+    } catch {
+        return apiUrl.replace(/\/+$/, '').endsWith('/responses');
+    }
+}
+
+function buildResponsesInput(messages: OpenAIChatMessage[]) {
+    return messages
+        .filter((message) => typeof message.content === 'string'
+            ? message.content.trim().length > 0
+            : message.content.length > 0)
+        .map((message) => ({
+            role: message.role,
+            content: typeof message.content === 'string'
+                ? message.content.trim()
+                : message.content.map((part) => part.type === 'text'
+                    ? {
+                        type: message.role === 'assistant' ? 'output_text' : 'input_text',
+                        text: part.text,
+                    }
+                    : {
+                        type: 'input_image',
+                        image_url: part.image_url.url,
+                    }),
+        }));
+}
+
+function buildResponsesRequestBody(
+    model: string,
+    systemPrompt: string,
+    messages: OpenAIChatMessage[],
+    maxTokens: number,
+) {
+    return {
+        model,
+        instructions: systemPrompt.trim(),
+        input: buildResponsesInput(messages),
+        max_output_tokens: maxTokens,
+    };
+}
+
 function extractTextsFromContent(content: unknown): string[] {
     if (typeof content === 'string') {
         return content ? [content] : [];
@@ -177,6 +234,73 @@ function extractTextsFromContent(content: unknown): string[] {
     }
 
     return texts;
+}
+
+export function extractOpenAIResponsesText(payload: OpenAIResponsesPayload): string {
+    if (typeof payload.output_text === 'string' && payload.output_text.trim()) {
+        return payload.output_text.trim();
+    }
+
+    return (payload.output || [])
+        .flatMap((item) => item.content || [])
+        .map((item) => typeof item.text === 'string' ? item.text : '')
+        .join('')
+        .trim();
+}
+
+async function requestOpenAIResponses(params: {
+    apiKey: string;
+    apiUrl: string;
+    requestModel: string;
+    systemPrompt: string;
+    messages: OpenAIChatMessage[];
+    maxTokens: number;
+}): Promise<string> {
+    const upstream = await fetch(params.apiUrl, {
+        method: 'POST',
+        headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${params.apiKey}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(buildResponsesRequestBody(
+            params.requestModel,
+            params.systemPrompt,
+            params.messages,
+            params.maxTokens,
+        )),
+    });
+
+    const contentType = upstream.headers.get('content-type') || '';
+    const rawResponse = await upstream.text().catch(() => upstream.statusText);
+    if (!upstream.ok || shouldTreatAsHtmlError(contentType, rawResponse)) {
+        throw buildUpstreamAppError({
+            context: upstream.ok ? 'unexpected HTML Responses response' : 'non-ok Responses response',
+            status: upstream.status,
+            contentType,
+            body: rawResponse || upstream.statusText,
+        });
+    }
+
+    let data: OpenAIResponsesPayload;
+    try {
+        data = JSON.parse(rawResponse) as OpenAIResponsesPayload;
+    } catch {
+        throw buildUpstreamAppError({
+            context: 'invalid Responses JSON payload',
+            status: upstream.status,
+            contentType,
+            body: rawResponse || 'Invalid JSON response',
+            fallbackStatus: 502,
+        });
+    }
+
+    const text = extractOpenAIResponsesText(data);
+    if (!text) {
+        throw new AppError('Upstream Responses payload missing output text', 502);
+    }
+
+    return text;
 }
 
 export function extractOpenAIStreamTexts(payload: string): string[] {
@@ -214,6 +338,17 @@ export async function requestYunwuOpenAIChat({
 }: OpenAIChatOptions): Promise<string> {
     const { apiKey, apiUrl, model } = getYunwuOpenAIChatConfig();
     const requestModel = modelOverride?.trim() || model;
+
+    if (isResponsesApiUrl(apiUrl)) {
+        return requestOpenAIResponses({
+            apiKey,
+            apiUrl,
+            requestModel,
+            systemPrompt,
+            messages,
+            maxTokens,
+        });
+    }
 
     const upstream = await fetch(apiUrl, {
         method: 'POST',
@@ -281,6 +416,19 @@ export async function streamYunwuOpenAIChat({
 }: StreamOptions): Promise<void> {
     const { apiKey, apiUrl, model } = getYunwuOpenAIChatConfig();
     const requestModel = modelOverride?.trim() || model;
+
+    if (isResponsesApiUrl(apiUrl)) {
+        const text = await requestOpenAIResponses({
+            apiKey,
+            apiUrl,
+            requestModel,
+            systemPrompt,
+            messages,
+            maxTokens,
+        });
+        onText(text);
+        return;
+    }
 
     const upstream = await fetch(apiUrl, {
         method: 'POST',

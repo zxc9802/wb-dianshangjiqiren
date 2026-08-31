@@ -2,7 +2,13 @@ import { prisma } from './prisma';
 import { AppError } from './auth';
 import { BUILTIN_BOT_MAP } from './builtin-bots';
 import { buildPromptWithBuiltinKnowledge } from './builtin-knowledge';
-import { DEFAULT_RESPONSE_MODEL, DEFAULT_WEB_SEARCH_MODE, type ResponseModel, type WebSearchMode } from './chat-models';
+import {
+    DEFAULT_RESPONSE_MODEL,
+    DEFAULT_WEB_SEARCH_MODE,
+    getOpenAIUpstreamModel,
+    type ResponseModel,
+    type WebSearchMode,
+} from './chat-models';
 import { streamGeminiDeepThinkingChat } from './gemini-deep-chat';
 import { getSystemPromptByBotId } from './server-bot-prompts';
 import { streamYunwuGeminiChat } from './yunwu-gemini-chat';
@@ -208,11 +214,13 @@ export async function streamExtensionCompletion(
     });
     const systemPromptWithWebSearch = enriched.systemPrompt;
 
-    if (responseModel === 'gpt-5.4') {
+    const openAIUpstreamModel = getOpenAIUpstreamModel(responseModel);
+    if (openAIUpstreamModel) {
         await streamYunwuOpenAIChat({
             systemPrompt: systemPromptWithWebSearch,
             messages: contents,
             temperature: 0.8,
+            model: openAIUpstreamModel,
             onText,
         });
         return;

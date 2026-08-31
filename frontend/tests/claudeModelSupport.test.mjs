@@ -76,6 +76,7 @@ test('chat model options include Claude Opus 4.6', async () => {
     RESPONSE_MODEL_VALUES,
     WEB_SEARCH_MODE_VALUES,
     DEFAULT_WEB_SEARCH_MODE,
+    getOpenAIUpstreamModel,
     getResponseModelLabel,
     getWebSearchModeLabel,
     isSelectableResponseModel,
@@ -84,13 +85,19 @@ test('chat model options include Claude Opus 4.6', async () => {
   } = await loadTsModule(['lib', 'chat-models.ts'])
 
   assert.ok(RESPONSE_MODEL_VALUES.includes('claude-opus-4.6'))
+  assert.ok(RESPONSE_MODEL_VALUES.includes('gpt-5.6-luna'))
   assert.equal(isResponseModel('claude-opus-4.6'), true)
   assert.equal(isResponseModel('gemini-deep-thinking'), true)
   assert.equal(isSelectableResponseModel('gemini-deep-thinking'), false)
   assert.deepEqual(
     JSON.parse(JSON.stringify(RESPONSE_MODEL_OPTIONS.map((option) => option.value))),
-    ['gemini', 'gpt-5.4', 'claude-opus-4.6'],
+    ['gemini', 'gpt-5.4', 'gpt-5.6-luna', 'claude-opus-4.6'],
   )
+  assert.equal(getResponseModelLabel('gpt-5.4'), 'GPT-5.5')
+  assert.equal(getResponseModelLabel('gpt-5.6-luna'), 'GPT-5.6')
+  assert.equal(getOpenAIUpstreamModel('gpt-5.4'), 'gpt-5.5')
+  assert.equal(getOpenAIUpstreamModel('gpt-5.6-luna'), 'gpt-5.6-luna')
+  assert.equal(getOpenAIUpstreamModel('gemini'), null)
   assert.equal(getResponseModelLabel('claude-opus-4.6'), 'Claude Opus 4.6')
   assert.deepEqual(JSON.parse(JSON.stringify(WEB_SEARCH_MODE_VALUES)), ['auto', 'on', 'off'])
   assert.equal(DEFAULT_WEB_SEARCH_MODE, 'auto')

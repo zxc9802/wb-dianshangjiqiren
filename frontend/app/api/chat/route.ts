@@ -5,6 +5,7 @@ import { buildPromptWithBuiltinKnowledge } from '../../lib/builtin-knowledge';
 import {
     DEFAULT_RESPONSE_MODEL,
     DEFAULT_WEB_SEARCH_MODE,
+    getOpenAIUpstreamModel,
     isResponseModel,
     isWebSearchMode,
     type ResponseModel,
@@ -113,11 +114,13 @@ async function streamByResponseModel(
     });
     const systemPromptWithWebSearch = enriched.systemPrompt;
 
-    if (responseModel === 'gpt-5.4') {
+    const openAIUpstreamModel = getOpenAIUpstreamModel(responseModel);
+    if (openAIUpstreamModel) {
         await streamYunwuOpenAIChat({
             systemPrompt: systemPromptWithWebSearch,
             messages: openAIMessages,
             temperature: 1,
+            model: openAIUpstreamModel,
             onText,
         });
         return;
