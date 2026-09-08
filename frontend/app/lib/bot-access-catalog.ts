@@ -10,6 +10,11 @@ export interface OfficialBotCatalogEntry {
 }
 
 const INDEPENDENT_TOOLS: OfficialBotCatalogEntry[] = [
+    { botKey: 'chanpinsheji', name: '产品设计', category: '电商工具', entryKind: 'tool' },
+    { botKey: 'sabc', name: 'SABC 客户分析', category: '电商工具', entryKind: 'tool' },
+    { botKey: 'xiaoshou', name: '销售助手', category: '电商工具', entryKind: 'tool' },
+    { botKey: 'baokuangaixie', name: '爆款改写', category: '电商工具', entryKind: 'tool' },
+
     { botKey: 'kb-chat', name: '起芽知识库机器人', category: '管理工具', entryKind: 'tool' },
     { botKey: 'copywriting-agent', name: '老黄 AI 文案总控', category: '电商工具', entryKind: 'tool' },
     { botKey: 'buyer-show', name: '买家秀智能体', category: '绘图机器人', entryKind: 'tool' },

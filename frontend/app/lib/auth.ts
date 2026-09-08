@@ -30,6 +30,11 @@ export function signToken(userId: string, authTokenVersion = 0): string {
     );
 }
 
+export function getTokenExpiresAt(token: string): number {
+    const payload = jwt.decode(token) as jwt.JwtPayload;
+    return Number(payload.exp) * 1000;
+}
+
 export async function ensureAccessControlBootstrap(): Promise<void> {
     if (bootstrapComplete) {
         return;

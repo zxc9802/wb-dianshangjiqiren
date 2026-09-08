@@ -304,6 +304,11 @@ const HOMEPAGE_BOTS: BotInfo[] = BUILTIN_BOTS
 const ALL_HOMEPAGE_BOTS: BotInfo[] = [
   KB_CHAT_TOOL,
   COPYWRITING_AGENT_TOOL,
+  { ...COPYWRITING_AGENT_TOOL, id: 'chanpinsheji', name: '产品设计', description: '使用主站账号进入产品设计。', path: '/bot/external/chanpinsheji' },
+  { ...COPYWRITING_AGENT_TOOL, id: 'sabc', name: 'SABC 客户分析', description: '使用主站账号进入SABC 客户分析。', path: '/bot/external/sabc' },
+  { ...COPYWRITING_AGENT_TOOL, id: 'xiaoshou', name: '销售助手', description: '使用主站账号进入销售助手。', path: '/bot/external/xiaoshou' },
+  { ...COPYWRITING_AGENT_TOOL, id: 'baokuangaixie', name: '爆款改写', description: '使用主站账号进入爆款改写。', path: '/bot/external/baokuangaixie' },
+
   ...HOMEPAGE_BOTS,
   BUYER_SHOW_TOOL,
   DETAIL_IMAGE_AGENT_TOOL,
