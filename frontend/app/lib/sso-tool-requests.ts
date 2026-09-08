@@ -67,7 +67,7 @@ export async function recordToolRequest(input: ToolRequest) {
     });
     return prisma.$transaction(async tx => {
         // Serializes even the first concurrent reservation, before a row exists.
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${input.product + ':' + input.requestId}, 0))`;
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${input.product + ':' + input.requestId}, 0))::text`;
         const rows = await tx.$queryRaw<{ data: Stored }[]>`SELECT data FROM sso_tool_requests
             WHERE product = ${input.product} AND request_id = ${input.requestId} FOR UPDATE`;
         const previous = rows[0]?.data;
