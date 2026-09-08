@@ -1,3 +1,4 @@
+import { withUsage } from '@/app/lib/usage-context';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getUserId, errorResponse } from '../../../lib/auth';
@@ -35,7 +36,7 @@ const chatMessageSchema = z.object({
     content: z.string(),
 });
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
     try {
         const userId = await getUserId(req);
         const { botId, mode, messages, pageContext, responseModel, webSearchMode } = z.object({
@@ -84,3 +85,5 @@ export async function POST(req: NextRequest) {
         return errorResponse(err);
     }
 }
+
+export const POST = withUsage(handlePost);

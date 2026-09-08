@@ -1,3 +1,4 @@
+import { usageFetch } from './usage-fetch';
 import { AppError } from './auth';
 import { readServerEnv } from './server-env';
 import {
@@ -256,7 +257,7 @@ async function requestOpenAIResponses(params: {
     messages: OpenAIChatMessage[];
     maxTokens: number;
 }): Promise<string> {
-    const upstream = await fetch(params.apiUrl, {
+    const upstream = await usageFetch(params.apiUrl, {
         method: 'POST',
         headers: {
             Accept: 'application/json',
@@ -350,7 +351,7 @@ export async function requestYunwuOpenAIChat({
         });
     }
 
-    const upstream = await fetch(apiUrl, {
+    const upstream = await usageFetch(apiUrl, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${apiKey}`,
@@ -430,7 +431,7 @@ export async function streamYunwuOpenAIChat({
         return;
     }
 
-    const upstream = await fetch(apiUrl, {
+    const upstream = await usageFetch(apiUrl, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${apiKey}`,

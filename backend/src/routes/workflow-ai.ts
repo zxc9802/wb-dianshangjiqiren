@@ -1,3 +1,4 @@
+import { usageFetch } from '../services/usage-fetch';
 import { Router, Response } from 'express';
 import { prisma } from '../utils/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
@@ -82,7 +83,7 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
         };
 
         const fullUrl = apiUrl.includes('?') ? `${apiUrl}&key=${apiKey}` : `${apiUrl}?key=${apiKey}`;
-        const aiRes = await fetch(fullUrl, {
+        const aiRes = await usageFetch(fullUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody),

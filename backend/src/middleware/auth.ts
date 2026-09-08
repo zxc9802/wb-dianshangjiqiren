@@ -1,3 +1,4 @@
+import { usageContext } from '../services/usage-context';
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppError } from './error';
@@ -39,7 +40,7 @@ export async function authMiddleware(req: AuthRequest, _res: Response, next: Nex
 
         req.userId = user.id;
         req.userRole = user.role;
-        next();
+        usageContext.run({ userId: user.id, source: 'main' }, () => next());
     } catch (error) {
         if (error instanceof AppError) {
             next(error);

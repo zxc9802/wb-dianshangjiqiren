@@ -1,3 +1,4 @@
+import { usageFetch } from './usage-fetch';
 import { AppError } from './auth';
 import { readServerEnv } from './server-env';
 
@@ -195,7 +196,7 @@ async function streamOpenAICompatibleGeminiChat(params: {
     temperature: number;
     maxOutputTokens: number;
 }): Promise<void> {
-    const upstream = await fetch(params.apiUrl, {
+    const upstream = await usageFetch(params.apiUrl, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${params.apiKey}`,
@@ -261,7 +262,7 @@ async function requestOpenAICompatibleGeminiChat(params: {
     temperature: number;
     maxOutputTokens: number;
 }): Promise<string> {
-    const upstream = await fetch(params.apiUrl, {
+    const upstream = await usageFetch(params.apiUrl, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${params.apiKey}`,
@@ -315,7 +316,7 @@ export async function streamYunwuGeminiChat({
     const apiUrl = normalizeStreamUrl(rawApiUrl);
     const contents = buildGeminiContents(messages);
 
-    const upstream = await fetch(apiUrl, {
+    const upstream = await usageFetch(apiUrl, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${apiKey}`,
@@ -437,7 +438,7 @@ export async function requestYunwuGeminiChat({
     const apiUrl = normalizeRequestUrl(rawApiUrl);
     const contents = buildGeminiContents(messages);
 
-    const upstream = await fetch(apiUrl, {
+    const upstream = await usageFetch(apiUrl, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${apiKey}`,

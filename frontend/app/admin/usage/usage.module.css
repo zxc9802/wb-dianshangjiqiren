@@ -1,0 +1,26 @@
+.page { max-width: 1500px; margin: auto; padding: 32px; color: var(--text-primary, #172033); }
+.page h1 { font-size: 28px; margin: 12px 0; }
+.page h2 { font-size: 20px; margin: 32px 0 16px; }
+.page p, .page small { color: var(--text-secondary, #64748b); line-height: 1.7; }
+.header, .filters, .pager { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.header a { color: #6366f1; }
+.page button, .page input, .page select { font: inherit; border: 1px solid var(--border-color, #d7dce4); border-radius: 8px; padding: 9px 12px; background: var(--bg-primary, white); color: inherit; }
+.page button { cursor: pointer; }
+.page button:disabled { cursor: default; opacity: .5; }
+.page button:focus-visible, .page input:focus-visible, .page select:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+.notice { padding: 16px; background: var(--bg-secondary, #f1f5f9); border-radius: 10px; }
+.filters { justify-content: flex-start; margin: 24px 0; }
+.filters label { display: grid; gap: 8px; font-size: 13px; }
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.cards article { border: 1px solid var(--border-color, #e2e8f0); border-radius: 12px; padding: 22px; }
+.cards strong { display: block; font-size: 28px; margin: 12px 0; overflow-wrap: anywhere; }
+.page small { display: block; font-size: 12px; }
+.table { overflow-x: auto; border: 1px solid var(--border-color, #e2e8f0); border-radius: 10px; }
+.table table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+.table th { white-space: nowrap; background: var(--bg-secondary, #f8fafc); }
+.table th, .table td { padding: 13px 16px; border-bottom: 1px solid var(--border-color, #e2e8f0); }
+.table td { vertical-align: top; }
+.table input { min-width: 90px; width: 130px; }
+.pager { justify-content: flex-end; margin: 16px 0; }
+.error { color: #dc2626 !important; }
+@media (max-width: 700px) { .page { padding: 16px; } .cards { grid-template-columns: 1fr; } .filters label { flex: 1; min-width: 140px; } }

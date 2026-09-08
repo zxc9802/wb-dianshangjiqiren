@@ -1,3 +1,4 @@
+import { usageFetch } from './usage-fetch';
 import { AppError } from './auth';
 import { readServerEnv } from './server-env';
 import type { GeminiChatMessage } from './yunwu-gemini-chat';
@@ -100,7 +101,7 @@ export async function streamGeminiDeepThinkingChat({
     const apiUrl = attachApiKeyToUrl(normalizeStreamUrl(readServerEnv('GEMINI_DEEP_CHAT_API_URL')), apiKey);
     const contents = buildGeminiContents(messages);
 
-    const upstream = await fetch(apiUrl, {
+    const upstream = await usageFetch(apiUrl, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${apiKey}`,
@@ -184,7 +185,7 @@ export async function requestGeminiDeepThinkingChat({
     const apiUrl = attachApiKeyToUrl(normalizeRequestUrl(readServerEnv('GEMINI_DEEP_CHAT_API_URL')), apiKey);
     const contents = buildGeminiContents(messages);
 
-    const upstream = await fetch(apiUrl, {
+    const upstream = await usageFetch(apiUrl, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${apiKey}`,

@@ -1,3 +1,4 @@
+import { withUsage } from '@/app/lib/usage-context';
 import { NextRequest } from 'next/server';
 import { prisma } from '../../../lib/prisma';
 import { getUserId, AppError, errorResponse } from '../../../lib/auth';
@@ -104,7 +105,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     }
 }
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function handlePost(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const userId = await getUserId(req);
         const { id } = await params;
@@ -155,3 +156,5 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return errorResponse(err);
     }
 }
+
+export const POST = withUsage(handlePost);

@@ -1,3 +1,4 @@
+import { usageFetch } from './usage-fetch';
 import { AppError } from './auth';
 import { readServerEnv } from './server-env';
 
@@ -146,7 +147,7 @@ async function analyzeInlineMediaWithGemini(
 
     try {
         if (isOpenAICompatibleChatUrl(apiUrl)) {
-            const upstream = await fetch(apiUrl, {
+            const upstream = await usageFetch(apiUrl, {
                 method: 'POST',
                 headers: {
                     Authorization: `Bearer ${apiKey}`,
@@ -180,7 +181,7 @@ async function analyzeInlineMediaWithGemini(
             return extractedText;
         }
 
-        const upstream = await fetch(apiUrl, {
+        const upstream = await usageFetch(apiUrl, {
             method: 'POST',
             headers: {
                 Authorization: `Bearer ${apiKey}`,

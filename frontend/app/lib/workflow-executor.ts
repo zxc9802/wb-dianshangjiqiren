@@ -1,3 +1,4 @@
+import { usageFetch } from './usage-fetch';
 import { prisma } from './prisma';
 import { readServerEnv } from './server-env';
 
@@ -74,7 +75,7 @@ async function callAI(
 
     const fullUrl = apiUrl.includes('?') ? `${apiUrl}&key=${apiKey}` : `${apiUrl}?key=${apiKey}`;
 
-    const res = await fetch(fullUrl, {
+    const res = await usageFetch(fullUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

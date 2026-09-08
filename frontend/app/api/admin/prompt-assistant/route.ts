@@ -1,3 +1,4 @@
+import { withUsage } from '@/app/lib/usage-context';
 import { NextRequest } from 'next/server';
 import { errorResponse, getAuthUser } from '../../../lib/auth';
 import { streamYunwuGeminiChat } from '../../../lib/yunwu-gemini-chat';
@@ -51,7 +52,7 @@ async function getExistingPrompts(): Promise<string> {
     return `\n\n以下是系统中现有机器人的提示词示例，请参考它们的结构和风格：\n\n${examples}`;
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
     try {
         await getAuthUser(req, { requireAdmin: true });
 
@@ -116,3 +117,5 @@ export async function POST(req: NextRequest) {
         return errorResponse(err);
     }
 }
+
+export const POST = withUsage(handlePost);

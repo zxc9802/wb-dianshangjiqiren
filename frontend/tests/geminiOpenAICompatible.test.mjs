@@ -23,6 +23,8 @@ async function loadGeminiModule(env, fetchImpl) {
   const cjsModule = { exports: {} }
   const localRequire = createRequire(sourcePath)
   const stubbedRequire = (specifier) => {
+    if (specifier === './usage-fetch') return { usageFetch: fetchImpl }
+    if (specifier === '@/app/lib/usage-context') return { withUsage: handler => handler }
     if (specifier === './auth') {
       return {
         AppError: class AppError extends Error {

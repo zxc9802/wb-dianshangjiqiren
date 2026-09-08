@@ -1,3 +1,4 @@
+import { usageFetch } from '../services/usage-fetch';
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../utils/prisma';
@@ -109,7 +110,7 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
             ? getSystemPromptBySortOrder(conversation.bot.sortOrder, fallbackPrompt)
             : conversation.bot.systemPrompt;
 
-        const upstream = await fetch(apiUrl, {
+        const upstream = await usageFetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

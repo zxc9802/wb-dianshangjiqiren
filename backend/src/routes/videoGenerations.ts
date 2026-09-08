@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto';
+import { prisma } from '../utils/prisma';
+import { recordUsage, ensureUsageLedger, type UsageEvent } from '../services/usage-ledger';
+import { emptyUsage, mergeUsage, parseTokenUsage } from '../services/usage-values';
 import { Router, Response } from 'express';
 import multer, { MulterError } from 'multer';
 import { AppError } from '../middleware/error';
@@ -169,6 +173,8 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
         formData.set('input_reference', asset.blob, asset.fileName);
     }
 
+    const usage: UsageEvent = { ...emptyUsage(), userId: req.userId, source: 'main', requestId: randomUUID(), provider: new URL(YUNWU_BASE_URL).hostname, model, status: 'pending', tokenBasis: 'missing' };
+    await recordUsage(usage);
     const upstream = await fetch(`${YUNWU_BASE_URL}/v1/videos`, {
         method: 'POST',
         headers: {
@@ -176,7 +182,7 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
             Accept: 'application/json',
         },
         body: formData,
-    });
+    }).catch(async error => { await recordUsage({ ...usage, status: 'failed' }); throw error; });
 
     const contentType = upstream.headers.get('content-type') || '';
     const payload = contentType.includes('application/json')
@@ -184,6 +190,7 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
         : { message: await upstream.text() };
 
     if (!upstream.ok) {
+        await recordUsage({ ...usage, status: 'failed' });
         return res.status(upstream.status).json({
             success: false,
             message: extractUpstreamMessage(payload, 'Video generation request failed'),
@@ -192,6 +199,8 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
     }
 
     const taskId = typeof payload.id === 'string' ? payload.id : null;
+    Object.assign(usage, mergeUsage(usage, parseTokenUsage(payload)));
+    await recordUsage({ ...usage, upstreamRequestId: taskId, tokenBasis: usage.totalTokens === null ? 'missing' : 'reported', status: taskId ? 'pending' : 'failed' });
     if (!taskId) {
         return res.status(502).json({
             success: false,
@@ -213,6 +222,9 @@ router.get('/status', async (req: AuthRequest, res: Response) => {
     if (!req.userId) throw new AppError('Unauthorized', 401);
 
     const taskId = requiredString(req.query.taskId, 'taskId');
+    await ensureUsageLedger();
+    const entries = await prisma.$queryRaw<{ data: UsageEvent }[]>`SELECT data FROM ai_usage_events WHERE user_id = ${req.userId} AND source = 'main' AND data->>'upstreamRequestId' = ${taskId} AND data->>'provider' = ${new URL(YUNWU_BASE_URL).hostname} LIMIT 1`;
+    const usage = entries[0]?.data;
     const upstream = await fetch(`${YUNWU_BASE_URL}/v1/videos/${encodeURIComponent(taskId)}`, {
         headers: {
             Authorization: `Bearer ${getVideoApiKey()}`,
@@ -231,6 +243,12 @@ router.get('/status', async (req: AuthRequest, res: Response) => {
             message: extractUpstreamMessage(payload, 'Video status request failed'),
             data: payload,
         });
+    }
+
+    if (usage && ['completed', 'succeeded', 'failed', 'cancelled'].includes(String(payload.status))) {
+        const tokens = mergeUsage(usage, parseTokenUsage(payload));
+        const completed = ['completed', 'succeeded'].includes(String(payload.status));
+        await recordUsage({ ...usage, ...tokens, status: completed ? 'completed' : 'failed', tokenBasis: tokens.totalTokens === null ? 'missing' : 'reported' });
     }
 
     res.json({

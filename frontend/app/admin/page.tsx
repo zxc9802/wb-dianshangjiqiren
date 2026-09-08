@@ -553,6 +553,7 @@ export default function AdminConsolePage() {
             </header>
 
             <nav className={styles.tabs} aria-label="管理员功能">
+                <button type="button" className={styles.tabButton} onClick={() => { if (confirmDiscard()) router.push('/admin/usage'); }}>员工用量监控</button>
                 <button
                     type="button"
                     className={`${styles.tabButton} ${activeTab === 'options' ? styles.tabActive : ''}`}

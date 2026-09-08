@@ -1,3 +1,4 @@
+import { usageContext } from './usage-context';
 import path from 'node:path';
 import type { Prisma } from '@prisma/client';
 import { AppError } from './auth';
@@ -231,14 +232,15 @@ export async function runVideoUploadJob(job: JobWithChunks): Promise<void> {
 
         let result: ChatAttachmentPayload;
         if (job.responseModel === 'gemini') {
-            result = await analyzeUploadedVideoForGemini({
-                absolutePath: mergedPath,
+            const analysisPath = mergedPath;
+            result = await usageContext.run({ userId: job.userId, source: 'main' }, () => analyzeUploadedVideoForGemini({
+                absolutePath: analysisPath,
                 fileName: job.fileName,
                 mimeType: job.mimeType,
                 fileSize: job.fileSize,
                 analysisPrompt: job.analysisPrompt,
                 onStage: (update) => updateProcessingStage(job.id, update),
-            });
+            }));
             mergedPath = undefined;
         } else {
             const processed = await processUploadedVideoFile({

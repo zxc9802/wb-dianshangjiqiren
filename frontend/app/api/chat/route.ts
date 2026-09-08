@@ -1,3 +1,4 @@
+import { withUsage } from '@/app/lib/usage-context';
 import { NextRequest } from 'next/server';
 import { errorResponse, getAuthUser } from '../../lib/auth';
 import { BUILTIN_BOT_MAP, GENERIC_CHAT_BOT_ID } from '../../lib/builtin-bots';
@@ -165,7 +166,7 @@ async function streamByResponseModel(
     });
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
     try {
         const user = await getAuthUser(req);
         const body = await req.json() as {
@@ -251,3 +252,5 @@ export async function POST(req: NextRequest) {
         return errorResponse(error);
     }
 }
+
+export const POST = withUsage(handlePost);
