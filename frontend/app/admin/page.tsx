@@ -458,7 +458,7 @@ export default function AdminConsolePage() {
         const site = MODEL_ACCESS_SITES.find((item) => item.siteKey === siteKey);
         if (!site) return;
         const policy = getModelAccessSiteSummary(draftModelAccess, siteKey);
-        const currentKeys = policy?.modelKeys || site.models.map((model) => model.modelKey);
+        const currentKeys = policy?.modelKeys || [];
         replaceDraftSiteModels(
             siteKey,
             currentKeys.includes(modelKey)
@@ -592,7 +592,7 @@ export default function AdminConsolePage() {
                     <div className={styles.sectionIntro}>
                         <div>
                             <h2>成员智能体权限</h2>
-                            <p>未单独配置的成员默认可用全部官方智能体、知识库岗位和模型。可在这里按成员分别限制四个入口的模型。</p>
+                            <p>未单独配置的成员默认可用全部官方智能体和知识库岗位；模型默认未授权，需在这里按成员勾选并保存。</p>
                         </div>
                         <button type="button" className={styles.actionButton} onClick={() => void loadAccessData()} disabled={loadingAccess}>
                             <RefreshCw size={16} className={loadingAccess ? styles.spinning : ''} /> 刷新
@@ -640,7 +640,7 @@ export default function AdminConsolePage() {
                                         <strong>{selectedMember.account}</strong>
                                         <span>组别：{selectedMember.groupName || '未分配组别'}</span>
                                         <em>{selectedMember.isActive
-                                            ? `${savedMode === 'all' ? '智能体默认全部' : savedBotKeys.length === 0 ? '智能体未开通' : '智能体已配置'} · ${savedRoleMode === 'all' ? '岗位默认全部' : '岗位已配置'} · ${savedModelAccess.sites.length === 0 ? '模型默认全部' : '模型已配置'}`
+                                            ? `${savedMode === 'all' ? '智能体默认全部' : savedBotKeys.length === 0 ? '智能体未开通' : '智能体已配置'} · ${savedRoleMode === 'all' ? '岗位默认全部' : '岗位已配置'} · ${savedModelAccess.sites.length === 0 ? '模型未授权' : '模型已配置'}`
                                             : '账号已停用'}</em>
                                     </div>
                                     <div className={styles.memberAccountBar}>
@@ -736,12 +736,12 @@ export default function AdminConsolePage() {
                                         </fieldset>
                                         {MODEL_ACCESS_SITES.map((site) => {
                                             const policy = getModelAccessSiteSummary(draftModelAccess, site.siteKey);
-                                            const selectedKeys = policy?.modelKeys || site.models.map((model) => model.modelKey);
+                                            const selectedKeys = policy?.modelKeys || [];
                                             return (
                                                 <fieldset className={styles.botGroup} key={site.siteKey}>
                                                     <legend>{site.name}模型</legend>
                                                     <p className={styles.roleHint}>
-                                                        {site.description} 当前：{policy ? '自定义白名单' : '默认全部可用'}。
+                                                        {site.description} 当前：{policy ? '自定义白名单' : '未授权'}。
                                                     </p>
                                                     <div className={styles.permissionToolbar}>
                                                         <span>已选 {selectedKeys.length} / {site.models.length}</span>
@@ -765,7 +765,7 @@ export default function AdminConsolePage() {
                                                                 className={styles.textButton}
                                                                 onClick={() => resetDraftSiteModels(site.siteKey)}
                                                             >
-                                                                恢复默认全部
+                                                                恢复未授权
                                                             </button>
                                                         </div>
                                                     </div>

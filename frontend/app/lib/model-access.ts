@@ -77,6 +77,14 @@ export const MODEL_ACCESS_SITES: readonly ModelAccessSiteDefinition[] = [
 
 export const DEFAULT_MODEL_ACCESS: ModelAccessSummary = { sites: [] };
 
+export const ALL_MODEL_ACCESS: ModelAccessSummary = {
+    sites: MODEL_ACCESS_SITES.map((site) => ({
+        siteKey: site.siteKey,
+        mode: 'selected',
+        modelKeys: site.models.map((model) => model.modelKey),
+    })),
+};
+
 const MODEL_ACCESS_SITE_KEY_SET = new Set<string>(MODEL_ACCESS_SITE_KEYS);
 
 export function isModelAccessSiteKey(value: unknown): value is ModelAccessSiteKey {
@@ -136,7 +144,7 @@ export function canUseModel(
     modelKey: string,
 ): boolean {
     const site = getModelAccessSiteSummary(summary, siteKey);
-    return !site || site.modelKeys.includes(modelKey);
+    return isModelKeyForSite(siteKey, modelKey) && Boolean(site?.modelKeys.includes(modelKey));
 }
 
 export function listAllowedModelKeys(
