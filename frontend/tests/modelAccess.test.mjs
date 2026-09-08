@@ -39,13 +39,13 @@ test('four managed entries expose their current selectable models', async () => 
   assert.equal(modelAccess.getModelAccessSiteKeyForBot('1'), null)
 })
 
-test('missing site policy means all models while selected policy is enforced', async () => {
+test('unconfigured members cannot see models while selected policy is enforced', async () => {
   const modelAccess = await loadModelAccess()
   const summary = {
     sites: [{ siteKey: 'main-general', mode: 'selected', modelKeys: ['gpt-5.4'] }],
   }
 
-  assert.equal(modelAccess.canUseModel(undefined, 'main-general', 'gpt-5.6-luna'), true)
+  assert.equal(modelAccess.canUseModel(undefined, 'main-general', 'gpt-5.6-luna'), false)
   assert.equal(modelAccess.canUseModel(summary, 'main-general', 'gpt-5.4'), true)
   assert.equal(modelAccess.canUseModel(summary, 'main-general', 'gpt-5.6-luna'), false)
   assert.deepEqual(modelAccess.listAllowedModelKeys(summary, 'main-general'), ['gpt-5.4'])
@@ -63,4 +63,15 @@ test('model access parser drops unknown sites and models', async () => {
   assert.deepEqual(parsed, {
     sites: [{ siteKey: 'kb-chat', mode: 'selected', modelKeys: ['yunwu-gpt-5.4'] }],
   })
+})
+
+test('missing policies deny every entry, including other sites of a configured member', async () => {
+  const access = await loadModelAccess()
+  for (const site of access.MODEL_ACCESS_SITES) {
+    assert.deepEqual(access.listAllowedModelKeys({ sites: [] }, site.siteKey), [])
+  }
+  assert.deepEqual(access.listAllowedModelKeys({ sites: [
+    { siteKey: 'main-general', mode: 'selected', modelKeys: ['gpt-5.4'] },
+  ] }, 'growth-assistant'), [])
+  assert.equal(access.canUseModel({ sites: [] }, 'main-general', 'not-real'), false)
 })

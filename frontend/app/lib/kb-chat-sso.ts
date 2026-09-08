@@ -4,6 +4,7 @@ import { prisma } from './prisma';
 import { readServerEnv } from './server-env';
 import { KB_CHAT_SITE_METADATA } from './kb-chat-site';
 import { ensureModelAccessTables } from './server-model-access';
+import { ALL_MODEL_ACCESS } from './model-access';
 import {
     ensureVideoSsoTicketTable,
     getMainAppUrl,
@@ -192,12 +193,14 @@ export async function consumeKbChatSsoTicket(ticketId: string) {
                     },
                 modelAccess: {
                     sites: user.role === 'admin'
-                        ? []
-                        : user.modelAccessPolicies.map((policy) => ({
+                        ? ALL_MODEL_ACCESS.sites.filter((site) => site.siteKey === 'kb-chat')
+                        : [{
                             siteKey: 'kb-chat' as const,
                             mode: 'selected' as const,
-                            modelKeys: policy.permissions.map((item) => item.modelKey),
-                        })),
+                            modelKeys: user.modelAccessPolicies.flatMap((policy) => (
+                                policy.permissions.map((item) => item.modelKey)
+                            )),
+                        }],
                 },
             },
         };

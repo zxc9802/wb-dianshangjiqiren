@@ -1,6 +1,6 @@
 import { AppError } from './auth';
 import {
-    DEFAULT_MODEL_ACCESS,
+    ALL_MODEL_ACCESS,
     canUseModel,
     isModelAccessSiteKey,
     isModelKeyForSite,
@@ -95,14 +95,14 @@ export function normalizeSelectedModelAccessSites(value: unknown): ModelAccessSi
 }
 
 export async function getUserModelAccessSummary(userId: string, role?: string): Promise<ModelAccessSummary> {
-    if (role === 'admin') return DEFAULT_MODEL_ACCESS;
+    if (role === 'admin') return ALL_MODEL_ACCESS;
 
     await ensureModelAccessTables();
     const resolvedRole = role || (await prisma.user.findUnique({
         where: { id: userId },
         select: { role: true },
     }))?.role;
-    if (resolvedRole === 'admin') return DEFAULT_MODEL_ACCESS;
+    if (resolvedRole === 'admin') return ALL_MODEL_ACCESS;
 
     const policies = await prisma.userModelAccessPolicy.findMany({
         where: { userId },

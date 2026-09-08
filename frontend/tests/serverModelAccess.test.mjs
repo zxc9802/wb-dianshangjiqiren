@@ -17,12 +17,11 @@ class TestAppError extends Error {
 }
 
 async function loadServerModelAccess(policies = []) {
-  const modelsBySite = {
-    'main-general': ['gemini', 'gpt-5.4', 'gpt-5.6-luna', 'claude-opus-4.6'],
-    'growth-assistant': ['gemini', 'gpt-5.4', 'gpt-5.6-luna', 'claude-opus-4.6'],
-    'video-breakdown': ['gemini', 'gpt-5.4', 'gpt-5.6-luna', 'claude-opus-4.6'],
-    'kb-chat': ['gemini-3.1-pro-preview', 'yunwu-gemini-3-flash-preview', 'yunwu-gpt-5.4', 'yunwu-gpt-5.6'],
-  }
+  const chatModels = await loadTsModule(path.join(testsRoot, '..', 'app', 'lib', 'chat-models.ts'))
+  const modelAccess = await loadTsModule(path.join(testsRoot, '..', 'app', 'lib', 'model-access.ts'), {
+    './builtin-bots': { GENERIC_CHAT_BOT_ID: '36', QIYA_ENTERPRISE_MANAGEMENT_BOT_ID: '35', VIDEO_BREAKDOWN_BOT_ID: '37' },
+    './chat-models': chatModels,
+  })
   const prisma = {
     $executeRawUnsafe: async () => 0,
     user: { findUnique: async () => ({ role: 'member' }) },
@@ -30,15 +29,7 @@ async function loadServerModelAccess(policies = []) {
   }
   return loadTsModule(sourcePath, {
     './auth': { AppError: TestAppError },
-    './model-access': {
-      DEFAULT_MODEL_ACCESS: { sites: [] },
-      canUseModel: (summary, siteKey, modelKey) => {
-        const site = summary.sites.find((item) => item.siteKey === siteKey)
-        return !site || site.modelKeys.includes(modelKey)
-      },
-      isModelAccessSiteKey: (siteKey) => Object.hasOwn(modelsBySite, siteKey),
-      isModelKeyForSite: (siteKey, modelKey) => modelsBySite[siteKey]?.includes(modelKey) === true,
-    },
+    './model-access': modelAccess,
     './prisma': { prisma },
   })
 }
@@ -55,6 +46,13 @@ test('member model policies preserve per-site allowlists including empty access'
       { siteKey: 'video-breakdown', mode: 'selected', modelKeys: [] },
     ],
   })
+  await service.assertUserCanUseModel('member-1', 'main-general', 'gpt-5.4', 'member')
+  for (const site of ['video-breakdown', 'growth-assistant']) {
+    await assert.rejects(
+      () => service.assertUserCanUseModel('member-1', site, 'gpt-5.4', 'member'),
+      (error) => error.status === 403 && error.code === 'MODEL_ACCESS_DENIED',
+    )
+  }
   await assert.rejects(
     () => service.assertUserCanUseModel('member-1', 'main-general', 'gpt-5.6-luna', 'member'),
     (error) => error.status === 403 && error.code === 'MODEL_ACCESS_DENIED',
@@ -63,7 +61,9 @@ test('member model policies preserve per-site allowlists including empty access'
 
 test('admins always receive default all-model access', async () => {
   const service = await loadServerModelAccess([])
-  assert.deepEqual(await service.getUserModelAccessSummary('admin-1', 'admin'), { sites: [] })
+  const summary = await service.getUserModelAccessSummary('admin-1', 'admin')
+  assert.equal(summary.sites.length, 4)
+  await service.assertUserCanUseModel('admin-1', 'main-general', 'gpt-5.6-luna', 'admin')
 })
 
 test('admin input rejects a model that does not belong to the selected site', async () => {
@@ -74,4 +74,14 @@ test('admin input rejects a model that does not belong to the selected site', as
     ]),
     (error) => error.code === 'INVALID_MODEL_ACCESS_MODEL',
   )
+})
+
+test('unconfigured members are denied on direct model calls, including role lookup', async () => {
+  const service = await loadServerModelAccess([])
+  for (const role of ['member', undefined]) {
+    await assert.rejects(
+      () => service.assertUserCanUseModel('member-1', 'main-general', 'gpt-5.6-luna', role),
+      (error) => error.status === 403 && error.code === 'MODEL_ACCESS_DENIED',
+    )
+  }
 })
