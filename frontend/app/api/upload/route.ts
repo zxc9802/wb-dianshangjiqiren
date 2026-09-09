@@ -1,3 +1,4 @@
+import { withUsage } from '@/app/lib/usage-context';
 import { NextRequest, NextResponse } from 'next/server';
 import { DEFAULT_RESPONSE_MODEL, isResponseModel } from '../../lib/chat-models';
 import { processUploadedVideo, storeUploadedVideoForModelUpload } from '../../lib/server-chat-video';
@@ -71,7 +72,7 @@ async function parseDocumentLocally(buffer: Buffer, ext: string): Promise<string
     throw new Error(`不支持的文件格式: .${ext}`);
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
     try {
         const formData = await req.formData();
         const file = formData.get('file');
@@ -172,3 +173,5 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: message }, { status: 500 });
     }
 }
+
+export const POST = withUsage(handlePost);

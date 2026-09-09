@@ -1,3 +1,4 @@
+import { usageFetch } from './usage-fetch';
 import { prisma } from '../utils/prisma';
 
 interface CanvasNode {
@@ -91,7 +92,7 @@ async function callAI(
         ? `${apiUrl}&key=${apiKey}`
         : `${apiUrl}?key=${apiKey}`;
 
-    const res = await fetch(fullUrl, {
+    const res = await usageFetch(fullUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),

@@ -1,3 +1,4 @@
+import { usageFetch } from './usage-fetch';
 import { prisma } from './prisma';
 import { readServerEnv } from './server-env';
 import { requestYunwuOpenAIChat } from './yunwu-openai-chat';
@@ -67,7 +68,7 @@ async function embedText(text: string): Promise<number[] | null> {
         return null;
     }
 
-    const response = await fetch(config.apiUrl, {
+    const response = await usageFetch(config.apiUrl, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${config.apiKey}`,

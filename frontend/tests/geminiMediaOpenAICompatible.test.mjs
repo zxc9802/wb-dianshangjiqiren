@@ -23,6 +23,7 @@ async function loadGeminiMediaModule(env, fetchImpl) {
   const cjsModule = { exports: {} }
   const localRequire = createRequire(sourcePath)
   const stubbedRequire = (specifier) => {
+    if (specifier === './usage-fetch') return { usageFetch: fetchImpl }
     if (specifier === './auth') {
       return {
         AppError: class AppError extends Error {

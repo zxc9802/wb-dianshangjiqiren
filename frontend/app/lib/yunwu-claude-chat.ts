@@ -1,3 +1,4 @@
+import { usageFetch } from './usage-fetch';
 import { AppError } from './auth';
 import { readServerEnv } from './server-env';
 import {
@@ -252,7 +253,7 @@ export async function requestYunwuClaudeChat({
 }: ClaudeChatOptions): Promise<string> {
     const { apiKey, apiUrl, model } = getYunwuClaudeChatConfig();
 
-    const upstream = await fetch(apiUrl, {
+    const upstream = await usageFetch(apiUrl, {
         method: 'POST',
         headers: {
             Accept: 'application/json',
@@ -312,7 +313,7 @@ export async function streamYunwuClaudeChat({
 }: StreamOptions): Promise<void> {
     const { apiKey, apiUrl, model } = getYunwuClaudeChatConfig();
 
-    const upstream = await fetch(apiUrl, {
+    const upstream = await usageFetch(apiUrl, {
         method: 'POST',
         headers: {
             Accept: 'application/json',

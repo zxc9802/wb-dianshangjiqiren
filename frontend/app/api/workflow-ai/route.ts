@@ -1,3 +1,5 @@
+import { usageFetch } from '@/app/lib/usage-fetch';
+import { withUsage } from '@/app/lib/usage-context';
 import { NextRequest } from 'next/server';
 import { prisma } from '../../lib/prisma';
 import { BUILTIN_BOTS } from '../../lib/builtin-bots';
@@ -36,7 +38,7 @@ ${BOT_LIST.map(b => `ID=${b.id} 名称=${b.name}`).join('\n')}
 - 节点间y坐标间隔150
 - recommendations最多2个`;
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
     try {
         const userId = await getUserId(req);
         const { prompt } = await req.json();
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
         if (!apiUrl || !apiKey) return Response.json({ success: false, message: 'AI API 未配置' }, { status: 500 });
 
         const fullUrl = apiUrl.includes('?') ? `${apiUrl}&key=${apiKey}` : `${apiUrl}?key=${apiKey}`;
-        const aiRes = await fetch(fullUrl, {
+        const aiRes = await usageFetch(fullUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -94,3 +96,5 @@ export async function POST(req: NextRequest) {
         return errorResponse(err);
     }
 }
+
+export const POST = withUsage(handlePost);

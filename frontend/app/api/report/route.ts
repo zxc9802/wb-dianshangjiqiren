@@ -1,3 +1,4 @@
+import { withUsage } from '@/app/lib/usage-context';
 import { NextRequest, NextResponse } from 'next/server';
 import { GPT_5_4_MODEL, requestYunwuOpenAIChat, type OpenAIChatMessage } from '../../lib/yunwu-openai-chat';
 
@@ -25,7 +26,7 @@ const REPORT_PROMPT = `你是一位专业的商业分析报告撰写专家。基
 - 所有内容用中文
 - 只输出 JSON，不要任何额外文字`;
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
     try {
         const { botId, botName, messages } = await req.json();
 
@@ -81,3 +82,5 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: msg }, { status: 500 });
     }
 }
+
+export const POST = withUsage(handlePost);

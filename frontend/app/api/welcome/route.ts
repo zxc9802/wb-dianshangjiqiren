@@ -1,3 +1,5 @@
+import { usageFetch } from '@/app/lib/usage-fetch';
+import { withUsage } from '@/app/lib/usage-context';
 import { NextRequest, NextResponse } from 'next/server';
 import { extractSuggestions, stripSuggestionBlock } from '../../lib/formatMessage';
 import { readServerEnv } from '../../lib/server-env';
@@ -18,7 +20,7 @@ function normalizeGenerateUrl(rawUrl?: string): string {
     }
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
     try {
         if (!API_KEY) {
             return NextResponse.json({ error: 'Missing welcome API key configuration' }, { status: 500 });
@@ -27,7 +29,7 @@ export async function POST(req: NextRequest) {
         const { systemPrompt, userMessage } = await req.json();
 
         const apiUrl = normalizeGenerateUrl(readServerEnv('YUNWU_WELCOME_API_URL') || readServerEnv('AI_API_URL'));
-        const upstream = await fetch(apiUrl, {
+        const upstream = await usageFetch(apiUrl, {
             method: 'POST',
             headers: {
                 Authorization: `Bearer ${API_KEY}`,
@@ -70,3 +72,5 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: msg }, { status: 500 });
     }
 }
+
+export const POST = withUsage(handlePost);

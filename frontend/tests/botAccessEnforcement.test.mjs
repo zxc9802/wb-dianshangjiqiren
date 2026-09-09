@@ -57,7 +57,7 @@ test('every official independent page has the correct access gate key', async ()
 
 test('server entry points check access before parsing or side effects', async () => {
   const messages = await readFile(path.join(appRoot, 'api', 'conversations', '[id]', 'messages', 'route.ts'), 'utf8')
-  const messagePost = messages.slice(messages.indexOf('export async function POST'))
+  const messagePost = messages.slice(messages.indexOf('async function handlePost'))
   assertBefore(messagePost, 'assertConversationBotAccess', 'parseMessageRequest(req)', 'messages')
   assertBefore(messagePost, 'assertUserCanUseModel', 'normalizeIncomingAttachments', 'message model access')
 
@@ -87,7 +87,7 @@ test('server entry points check access before parsing or side effects', async ()
 
 test('legacy direct chat and saved workflows cannot bypass access', async () => {
   const directChat = await readFile(path.join(appRoot, 'api', 'chat', 'route.ts'), 'utf8')
-  const directPost = directChat.slice(directChat.indexOf('export async function POST'))
+  const directPost = directChat.slice(directChat.indexOf('async function handlePost'))
   assertBefore(directPost, 'getAuthUser(req)', 'await req.json()', 'direct chat authentication')
   assertBefore(directPost, 'assertUserCanAccessOfficialBot', 'streamByResponseModel(', 'direct chat authorization')
   assertBefore(directPost, 'assertUserCanUseModel', 'streamByResponseModel(', 'direct chat model authorization')

@@ -1,3 +1,4 @@
+import { usageFetch } from '../services/usage-fetch';
 import { Router, Response } from 'express';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -206,7 +207,7 @@ async function generateOneImage(args: {
         });
 
         try {
-            const response = await fetch(request.url, {
+            const response = await usageFetch(request.url, {
                 method: 'POST',
                 headers: request.headers,
                 body: request.body,

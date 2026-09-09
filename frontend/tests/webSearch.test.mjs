@@ -23,6 +23,7 @@ async function loadTsModule(relativePath, options = {}) {
   const cjsModule = { exports: {} }
   const localRequire = createRequire(sourcePath)
   const stubbedRequire = (specifier) => {
+    if (specifier === './usage-fetch') return { usageFetch: options.fetch }
     if (specifier === './server-env') {
       return {
         readServerEnv: (key) => options.env?.[key],

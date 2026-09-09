@@ -1,3 +1,4 @@
+import { usageFetch } from './usage-fetch';
 import { readServerEnv } from './server-env';
 import {
     DEFAULT_WEB_SEARCH_MODE,
@@ -95,7 +96,7 @@ async function searchYunwu(query: string): Promise<string> {
     }
 
     const apiUrl = readServerEnv('YUNWU_SEARCH_API_URL')?.trim() || DEFAULT_YUNWU_SEARCH_API_URL;
-    const response = await fetch(apiUrl, {
+    const response = await usageFetch(apiUrl, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${apiKey}`,

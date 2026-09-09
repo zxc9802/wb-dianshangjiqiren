@@ -1,3 +1,4 @@
+import { withUsage } from '@/app/lib/usage-context';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '../../../../lib/prisma';
@@ -556,7 +557,7 @@ async function compileImagePromptBrief({
     }
 }
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function handlePost(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     let tempVideoTokensToCleanup: string[] = [];
 
     try {
@@ -1187,3 +1188,5 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return errorResponse(error);
     }
 }
+
+export const POST = withUsage(handlePost);

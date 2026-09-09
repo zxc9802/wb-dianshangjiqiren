@@ -416,3 +416,28 @@ model SystemSetting {
 
   @@map("system_settings")
 }
+
+model AiUsageEvent {
+  id String @id
+  userId String @map("user_id")
+  source String
+  requestId String @map("request_id")
+  data Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([source, requestId])
+  @@index([userId, createdAt], map: "ai_usage_events_user_date")
+  @@index([createdAt], map: "ai_usage_events_date")
+  @@map("ai_usage_events")
+}
+
+model SsoToolRequest {
+  product String
+  requestId String @map("request_id")
+  data Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@id([product, requestId])
+  @@map("sso_tool_requests")
+}

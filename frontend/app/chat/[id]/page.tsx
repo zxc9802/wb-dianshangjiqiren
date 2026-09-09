@@ -1783,7 +1783,7 @@ function ChatPageContent() {
         formData.append('file', file);
         formData.append('responseModel', model);
 
-        const response = await fetch('/api/upload', { method: 'POST', body: formData });
+        const response = await fetch('/api/upload', { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }, body: formData });
         const data = await readJsonResponse<Record<string, unknown>>(response, '文件上传失败，请稍后重试。');
         if (typeof data.error === 'string' && data.error) throw new Error(data.error);
 
@@ -2498,7 +2498,7 @@ function ChatPageContent() {
         try {
             const response = await fetch('/api/report', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
                 body: JSON.stringify({ botId, botName, messages }),
             });
             const data = await response.json();

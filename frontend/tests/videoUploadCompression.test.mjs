@@ -26,6 +26,7 @@ async function loadServerChatVideoModule(env = {}, stubs = {}) {
   const cjsModule = { exports: {} }
   const localRequire = createRequire(sourcePath)
   const stubbedRequire = (specifier) => {
+    if (specifier === '@/app/lib/usage-context') return { withUsage: handler => handler }
     if (specifier === 'node:child_process') {
       return { execFile: stubs.execFile || localRequire(specifier).execFile }
     }
@@ -96,6 +97,7 @@ async function loadUploadRouteModule(stubs = {}) {
   const cjsModule = { exports: {} }
   const localRequire = createRequire(sourcePath)
   const stubbedRequire = (specifier) => {
+    if (specifier === '@/app/lib/usage-context') return { withUsage: handler => handler }
     if (specifier === 'next/server') {
       return {
         NextResponse: {

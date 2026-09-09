@@ -23,6 +23,8 @@ async function loadTsModule(relativePath, options = {}) {
   const cjsModule = { exports: {} }
   const localRequire = createRequire(sourcePath)
   const stubbedRequire = (specifier) => {
+    if (specifier === './usage-fetch') return { usageFetch: options.fetch }
+    if (specifier === '@/app/lib/usage-context') return { withUsage: handler => handler }
     if (options.stubs?.[specifier]) {
       return options.stubs[specifier]
     }

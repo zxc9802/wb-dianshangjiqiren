@@ -191,7 +191,7 @@ export default function AdminBotPanel({ botId, botKind, isOpen, onClose }: Admin
         try {
             const formData = new FormData();
             formData.append('file', file);
-            const parseRes = await fetch('/api/upload', { method: 'POST', body: formData });
+            const parseRes = await fetch('/api/upload', { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }, body: formData });
             if (!parseRes.ok) {
                 const errData = await parseRes.json().catch(() => ({}));
                 throw new Error(errData.error || '文件解析失败');
