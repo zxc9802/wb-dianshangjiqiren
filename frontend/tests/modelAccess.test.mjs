@@ -36,7 +36,8 @@ test('four managed entries expose their current selectable models', async () => 
   assert.equal(modelAccess.getModelAccessSiteKeyForBot('36'), 'main-general')
   assert.equal(modelAccess.getModelAccessSiteKeyForBot('35'), 'growth-assistant')
   assert.equal(modelAccess.getModelAccessSiteKeyForBot('37'), 'video-breakdown')
-  assert.equal(modelAccess.getModelAccessSiteKeyForBot('1'), null)
+  assert.equal(modelAccess.getModelAccessSiteKeyForBot('1'), 'main-general')
+  assert.equal(modelAccess.getModelAccessSiteKeyForBot('custom-example'), 'main-general')
 })
 
 test('unconfigured members cannot see models while selected policy is enforced', async () => {
@@ -74,4 +75,18 @@ test('missing policies deny every entry, including other sites of a configured m
     { siteKey: 'main-general', mode: 'selected', modelKeys: ['gpt-5.4'] },
   ] }, 'growth-assistant'), [])
   assert.equal(access.canUseModel({ sites: [] }, 'main-general', 'not-real'), false)
+})
+
+
+test('ordinary and custom main-site bots share the explicit model allowlist', async () => {
+  const access = await loadModelAccess()
+  const summary = { sites: [
+    { siteKey: 'main-general', mode: 'selected', modelKeys: ['gpt-5.4'] },
+  ] }
+  for (const botId of ['1', '2', '34', '36', 'custom-example']) {
+    const site = access.getModelAccessSiteKeyForBot(botId)
+    assert.deepEqual(access.listAllowedModelKeys(summary, site), ['gpt-5.4'])
+    assert.equal(access.canUseModel(summary, site, 'gpt-5.6-luna'), false)
+    assert.deepEqual(access.listAllowedModelKeys(undefined, site), [])
+  }
 })

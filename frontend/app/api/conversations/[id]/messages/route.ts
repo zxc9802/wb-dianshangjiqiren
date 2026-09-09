@@ -594,12 +594,8 @@ async function handlePost(req: NextRequest, { params }: { params: Promise<{ id: 
             attachments: incomingAttachments,
             inlineVideoUploads,
         } = await parseMessageRequest(req);
-        const modelAccessSiteKey = bot.kind === 'builtin'
-            ? getModelAccessSiteKeyForBot(bot.routeId)
-            : null;
-        if (modelAccessSiteKey) {
-            await assertUserCanUseModel(userId, modelAccessSiteKey, responseModel);
-        }
+        const modelAccessSiteKey = getModelAccessSiteKeyForBot(bot.routeId);
+        await assertUserCanUseModel(userId, modelAccessSiteKey, responseModel);
 
         const normalizedAttachments = normalizeIncomingAttachments(incomingAttachments);
         let inlineVideoIndex = 0;

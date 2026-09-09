@@ -1,5 +1,4 @@
 import {
-    GENERIC_CHAT_BOT_ID,
     QIYA_ENTERPRISE_MANAGEMENT_BOT_ID,
     VIDEO_BREAKDOWN_BOT_ID,
 } from './builtin-bots';
@@ -51,8 +50,8 @@ const KB_CHAT_MODELS: readonly ModelAccessModelDefinition[] = [
 export const MODEL_ACCESS_SITES: readonly ModelAccessSiteDefinition[] = [
     {
         siteKey: 'main-general',
-        name: '主站通用输入框',
-        description: '首页通用聊天输入框与通用聊天会话。',
+        name: '主站聊天智能体',
+        description: '首页通用聊天、其他主站内置及自定义智能体；成长特助和视频拆解使用各自的单独授权。',
         models: MAIN_CHAT_MODELS,
     },
     {
@@ -95,11 +94,10 @@ export function getModelAccessSite(siteKey: ModelAccessSiteKey): ModelAccessSite
     return MODEL_ACCESS_SITES.find((site) => site.siteKey === siteKey) as ModelAccessSiteDefinition;
 }
 
-export function getModelAccessSiteKeyForBot(botKey: string): ModelAccessSiteKey | null {
-    if (botKey === GENERIC_CHAT_BOT_ID) return 'main-general';
+export function getModelAccessSiteKeyForBot(botKey: string): ModelAccessSiteKey {
     if (botKey === QIYA_ENTERPRISE_MANAGEMENT_BOT_ID) return 'growth-assistant';
     if (botKey === VIDEO_BREAKDOWN_BOT_ID) return 'video-breakdown';
-    return null;
+    return 'main-general';
 }
 
 export function isModelKeyForSite(siteKey: ModelAccessSiteKey, modelKey: string): boolean {

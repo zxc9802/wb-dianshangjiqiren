@@ -1145,9 +1145,7 @@ function ChatPageContent() {
     const { user } = useAuthStore();
     const modelAccessSiteKey = getModelAccessSiteKeyForBot(botId);
     const allowedResponseModelOptions = useMemo(() => (
-        modelAccessSiteKey
-            ? RESPONSE_MODEL_OPTIONS.filter((option) => canUseModel(user?.modelAccess, modelAccessSiteKey, option.value))
-            : RESPONSE_MODEL_OPTIONS
+        RESPONSE_MODEL_OPTIONS.filter((option) => canUseModel(user?.modelAccess, modelAccessSiteKey, option.value))
     ), [modelAccessSiteKey, user?.modelAccess]);
     const hasResponseModelAccess = allowedResponseModelOptions.length > 0;
     const isAdmin = user?.role === 'admin';

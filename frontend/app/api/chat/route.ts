@@ -187,9 +187,7 @@ async function handlePost(req: NextRequest) {
         }
         const responseModel = isResponseModel(body.responseModel) ? body.responseModel : DEFAULT_RESPONSE_MODEL;
         const modelAccessSiteKey = getModelAccessSiteKeyForBot(botIdString || GENERIC_CHAT_BOT_ID);
-        if (modelAccessSiteKey) {
-            await assertUserCanUseModel(user.id, modelAccessSiteKey, responseModel, user.role);
-        }
+        await assertUserCanUseModel(user.id, modelAccessSiteKey, responseModel, user.role);
         const webSearchMode = isWebSearchMode(body.webSearchMode) ? body.webSearchMode : DEFAULT_WEB_SEARCH_MODE;
         const normalizedMessages = normalizeMessages(body.messages, body.conversationHistory, body.message);
         const builtinFallbackPrompt = BUILTIN_BOT_MAP[botIdString]?.systemPromptFallback;
