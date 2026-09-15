@@ -281,6 +281,11 @@ export const api = {
     getConversation: (id: string) =>
         request<{ success: boolean; data: ConversationDetail }>(`/conversations/${id}`),
 
+    createChatShare: (id: string, messageIds: string[]) =>
+        request<{ success: boolean; data: { path: string } }>(`/conversations/${id}/shares`, {
+            method: 'POST', body: JSON.stringify({ messageIds }),
+        }),
+
     toggleFavorite: (id: string) =>
         request<{ success: boolean; data: { isFavorited: boolean } }>(`/conversations/${id}`, { method: 'PATCH' }),
 

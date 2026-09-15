@@ -431,6 +431,17 @@ model AiUsageEvent {
   @@map("ai_usage_events")
 }
 
+model ChatShare {
+  token          String   @id
+  ownerId        String   @map("owner_id")
+  conversationId String   @map("conversation_id")
+  snapshot       Json
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([ownerId])
+  @@map("chat_shares")
+}
+
 model SsoToolRequest {
   product String
   requestId String @map("request_id")

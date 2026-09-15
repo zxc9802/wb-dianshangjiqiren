@@ -4,6 +4,7 @@ import { estimateUsageCost, type TokenUsage, type UsageRate } from './usage-valu
 
 export type UsageEvent = TokenUsage & {
     userId: string; source: string; requestId: string; provider: string; model: string;
+    botId?: string; botName?: string;
     status: 'pending' | 'completed' | 'failed' | 'interrupted';
     tokenBasis: 'reported' | 'estimated' | 'missing';
     amount?: number | null; currency?: 'USD' | 'CNY' | null;

@@ -528,6 +528,11 @@
     overflow-anchor: none;
 }
 
+.messagesContainer.sharingMessages { padding-bottom: 260px; }
+.sharingInput { display: none !important; }
+.shareCheckbox { display: flex; align-items: flex-start; padding: 16px 8px; flex-shrink: 0; cursor: pointer; }
+.shareCheckbox input { width: 20px; height: 20px; accent-color: #2563eb; cursor: pointer; }
+
 .messages {
     max-width: 760px;
     margin: 0 auto;
@@ -1372,8 +1377,15 @@
 /* Mobile responsive */
 @media (max-width: 768px) {
     .header {
-        padding: 0 var(--space-md);
+        padding: 8px var(--space-md);
+        height: auto;
+        min-height: 60px;
+        flex-wrap: wrap;
+        gap: 8px;
     }
+
+    .headerLeft, .headerRight { flex-wrap: wrap; }
+    .header button { white-space: nowrap; flex-shrink: 0; }
 
     .messagesContainer {
         padding: var(--space-md);

@@ -1,4 +1,4 @@
-import { withUsage } from '@/app/lib/usage-context';
+import { setUsageBot, withUsage } from '@/app/lib/usage-context';
 import { NextRequest } from 'next/server';
 import { errorResponse, getAuthUser } from '../../lib/auth';
 import { BUILTIN_BOT_MAP, GENERIC_CHAT_BOT_ID } from '../../lib/builtin-bots';
@@ -22,6 +22,7 @@ import { streamYunwuOpenAIChat, type OpenAIChatMessage } from '../../lib/yunwu-o
 import { enrichSystemPromptWithWebSearch } from '../../lib/web-search';
 import { assertUserCanAccessOfficialBot } from '../../lib/server-bot-access';
 import { assertUserCanUseModel } from '../../lib/server-model-access';
+import { prisma } from '../../lib/prisma';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -188,6 +189,21 @@ async function handlePost(req: NextRequest) {
         const responseModel = isResponseModel(body.responseModel) ? body.responseModel : DEFAULT_RESPONSE_MODEL;
         const modelAccessSiteKey = getModelAccessSiteKeyForBot(botIdString || GENERIC_CHAT_BOT_ID);
         await assertUserCanUseModel(user.id, modelAccessSiteKey, responseModel, user.role);
+        const usageBotId = botIdString || GENERIC_CHAT_BOT_ID;
+        if (usageBotId.startsWith('custom-')) {
+            const bot = await prisma.customBot.findFirst({
+                where: { id: usageBotId.slice('custom-'.length), userId: user.id, isActive: true },
+                select: { id: true, name: true },
+            });
+            if (bot) setUsageBot(`custom-${bot.id}`, bot.name);
+        } else {
+            const bot = await prisma.bot.findFirst({
+                where: /^\d+$/.test(usageBotId) ? { sortOrder: Number(usageBotId), isActive: true } : { id: usageBotId, isActive: true },
+                select: { name: true, sortOrder: true },
+            });
+            const name = bot?.name || BUILTIN_BOT_MAP[usageBotId]?.name;
+            if (name) setUsageBot(bot ? String(bot.sortOrder) : usageBotId, name);
+        }
         const webSearchMode = isWebSearchMode(body.webSearchMode) ? body.webSearchMode : DEFAULT_WEB_SEARCH_MODE;
         const normalizedMessages = normalizeMessages(body.messages, body.conversationHistory, body.message);
         const builtinFallbackPrompt = BUILTIN_BOT_MAP[botIdString]?.systemPromptFallback;
