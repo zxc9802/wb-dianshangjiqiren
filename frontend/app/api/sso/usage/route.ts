@@ -13,6 +13,7 @@ const schema = z.object({
     status: z.enum(['completed', 'failed', 'interrupted']),
     inputTokens: tokens, outputTokens: tokens, totalTokens: tokens,
     cachedInputTokens: tokens.default(null), cacheWriteTokens: tokens.default(null), reasoningTokens: tokens.default(null),
+    imageInputTokens: tokens.optional(),
     tokenBasis: z.enum(['reported', 'estimated', 'missing']),
     amount: z.number().finite().min(0).max(1_000_000).nullable().optional(),
     currency: z.enum(['USD', 'CNY']).nullable().optional(),
@@ -22,6 +23,7 @@ const schema = z.object({
     if (v.amount != null && (!v.currency || !v.costBasis || v.costBasis === 'missing')) ctx.addIssue({ code: 'custom', message: '金额必须附带币种和计价依据。' });
     if (v.amount == null && v.costBasis && v.costBasis !== 'missing') ctx.addIssue({ code: 'custom', message: '缺少金额。' });
     if (v.inputTokens !== null && (v.cachedInputTokens ?? 0) + (v.cacheWriteTokens ?? 0) > v.inputTokens) ctx.addIssue({ code: 'custom', message: '缓存 Token 超过输入 Token。' });
+    if (v.inputTokens !== null && (v.imageInputTokens ?? 0) > v.inputTokens) ctx.addIssue({ code: 'custom', message: '图片 Token 超过输入 Token。' });
     if (v.inputTokens !== null && v.outputTokens !== null && v.totalTokens !== v.inputTokens + v.outputTokens) ctx.addIssue({ code: 'custom', message: 'Token 总量不一致。' });
     if (v.tokenBasis === 'missing' && [v.inputTokens, v.outputTokens, v.totalTokens].some(n => n !== null)) ctx.addIssue({ code: 'custom', message: '缺失用量必须为 null。' });
 });

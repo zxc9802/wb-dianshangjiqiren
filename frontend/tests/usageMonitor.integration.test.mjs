@@ -28,10 +28,14 @@ test('PostgreSQL: idempotent SSO ingestion, admin authorization, dates and curre
         },
     };
     const values = await loadTsModule(path.join(app, 'lib/usage-values.ts'));
-    const ledger = await loadTsModule(path.join(app, 'lib/usage-ledger.ts'), { 'node:crypto': crypto, './prisma': { prisma: db }, './usage-values': values });
+    const catalog = await loadTsModule(path.join(app, 'lib/usage-rate-catalog.ts'));
+    const pricing = await loadTsModule(path.join(app, 'lib/usage-pricing.ts'), { './usage-rate-catalog': catalog });
+    const reportPricing = await loadTsModule(path.join(app, 'lib/usage-report-pricing.ts'), { '@prisma/client': { Prisma } });
+    const ledger = await loadTsModule(path.join(app, 'lib/usage-ledger.ts'), { 'node:crypto': crypto, './prisma': { prisma: db }, './usage-values': values, './usage-pricing': pricing });
     const admin = await loadTsModule(path.join(app, 'api/admin/usage/route.ts'), {
         '@prisma/client': { Prisma }, zod: { z }, '@/app/lib/auth': auth,
         '@/app/lib/prisma': { prisma: db }, '@/app/lib/usage-ledger': ledger,
+        '@/app/lib/usage-pricing': pricing, '@/app/lib/usage-report-pricing': reportPricing,
     });
     const sso = await loadTsModule(path.join(app, 'api/sso/usage/route.ts'), {
         'node:crypto': crypto, zod: { z }, '@/app/lib/auth': auth, '@/app/lib/prisma': { prisma: db }, '@/app/lib/usage-ledger': ledger,
@@ -100,6 +104,53 @@ test('PostgreSQL: idempotent SSO ingestion, admin authorization, dates and curre
             assert.equal(group.amount, .002);
         }
         assert.equal(attributed.rows.filter(row => row.data.botId).length, 3);
+
+        const historical = { ...values.emptyUsage(), userId, source: 'sso:kb-chat', provider: 'api.openlux.ai', model: 'gpt-6-astra', status: 'completed', tokenBasis: 'reported', inputTokens: 1000, outputTokens: 100, totalTokens: 1100, cachedInputTokens: 200, cacheWriteTokens: 100, amount: null, costBasis: 'missing' };
+        const cases = [
+            { data: historical, expected: .00049451 },
+            { data: { ...historical, provider: 'openlux' }, expected: .00049451 },
+            { data: { ...historical, provider: 'yunwu.ai' }, expected: null },
+            { data: { ...historical, amount: .75, currency: 'USD', costBasis: 'actual' }, expected: .75 },
+            { data: { ...historical, amount: .65, currency: 'CNY', costBasis: 'estimated' }, expected: .65 },
+            { data: { ...historical, status: 'failed' }, expected: null },
+            { data: { ...historical, status: 'pending' }, expected: null },
+            { data: { ...historical, model: 'claude-opus-4-6' }, expected: null },
+            { data: { ...historical, model: 'gpt-image-2', cachedInputTokens: 0, cacheWriteTokens: 0, imageInputTokens: 800 }, expected: .00061182 },
+            { data: { ...historical, model: 'gpt-image-2', cachedInputTokens: 0, cacheWriteTokens: 0 }, expected: null },
+            { data: { ...historical, model: 'gpt-image-2-c', ...values.emptyUsage(), tokenBasis: 'missing' }, expected: .00882 },
+            { data: { ...historical, model: 'unknown-model' }, expected: null },
+            { data: { ...historical, ...values.emptyUsage(), tokenBasis: 'missing' }, expected: null },
+            { data: { ...historical, inputTokens: 0, outputTokens: 0, totalTokens: 0, cachedInputTokens: 0, cacheWriteTokens: 0 }, expected: 0 },
+        ];
+        for (const [index, scenario] of cases.entries()) {
+            const data = { ...scenario.data, requestId: `${prefix}-history-${index}` };
+            await db.$executeRaw`INSERT INTO ai_usage_events (id, user_id, source, request_id, data) VALUES (${crypto.randomUUID()}, ${userId}, ${data.source}, ${data.requestId}, ${JSON.stringify(data)}::jsonb)`;
+        }
+        const history = await read('admin-test', '&source=sso:kb-chat').then(r => r.json());
+        assert.equal(history.total, cases.length);
+        for (const [index, scenario] of cases.entries()) {
+            const shown = history.rows.find(row => row.data.requestId === `${prefix}-history-${index}`).data;
+            if (scenario.expected === null) assert.equal(shown.amount, null);
+            else assert.ok(Math.abs(shown.amount - scenario.expected) < 1e-12, `history ${index}: ${shown.amount}`);
+            const priced = await ledger.priceUsage({ ...scenario.data, requestId: 'unit' });
+            if (priced.amount == null) assert.equal(shown.amount, null);
+            else assert.ok(Math.abs(shown.amount - priced.amount) < 1e-12, `SQL and ingestion pricing must agree for case ${index}`);
+            if (scenario.expected != null && scenario.data.amount == null) assert.equal(shown.historicalEstimate, true);
+        }
+        const stored = await db.$queryRaw`SELECT data FROM ai_usage_events WHERE request_id = ${`${prefix}-history-0`}`;
+        assert.equal(stored[0].data.amount, null, 'reading estimates does not rewrite historical rows');
+        assert.ok(history.groups.some(group => group.currency === 'CNY' && group.amount === .65));
+        const override = { ...catalog.DEFAULT_USAGE_RATES[0], inputPerMillion: 1 };
+        assert.equal((await admin.PUT(new Request('https://main.test/api/admin/usage', { method: 'PUT', headers: { authorization: 'admin-test' }, body: JSON.stringify([rate, override]) }))).status, 200);
+        const repriced = await read('admin-test', '&source=sso:kb-chat').then(r => r.json());
+        const first = repriced.rows.find(row => row.data.requestId === `${prefix}-history-0`).data;
+        assert.ok(Math.abs(first.amount - .00093712) < 1e-12);
+        assert.equal(repriced.rows.find(row => row.data.requestId === `${prefix}-history-3`).data.amount, .75);
+        const unknownImageRate = { ...catalog.DEFAULT_USAGE_RATES.find(r => r.model === 'gpt-image-2'), imageInputPerMillion: null };
+        assert.equal((await admin.PUT(new Request('https://main.test/api/admin/usage', { method: 'PUT', headers: { authorization: 'admin-test' }, body: JSON.stringify([rate, unknownImageRate]) }))).status, 200);
+        const imageUnknown = await read('admin-test', '&source=sso:kb-chat').then(r => r.json());
+        assert.equal(imageUnknown.rows.find(row => row.data.requestId === `${prefix}-history-8`).data.amount, null);
+        assert.equal((await ledger.priceUsage({ ...cases[8].data, requestId: 'unit' })).amount, null);
     } finally {
         await db.$executeRaw`DELETE FROM ai_usage_events WHERE user_id = ${userId}`;
         await db.user.deleteMany({ where: { id: userId } });
