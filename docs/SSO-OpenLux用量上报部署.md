@@ -60,19 +60,19 @@ USAGE_MONITOR_INTERNAL_SECRET=主站JSON中这个工具对应的密钥
 
 ## 代码交付（2026-09-16）
 
-主站和知识库已推送到指定分支。其余八个工具已推送功能分支并建立草稿 PR，尚未合入默认分支；下表给出可审查和合并的入口。合并后仍需按上述顺序部署，Git 推送本身不代表线上已启用。
+下表列出用户明确指定的部署分支，代码已推送到这些分支。各工具以对应分支原有代码为基础迁入 OpenLux 上报，保留该分支的 SSO、上传、后台任务和积分流程。此前指向错误分支的合并已回退，不要使用旧 PR 的目标分支部署。Git 推送本身不代表线上已启用，仍需按上述顺序部署。
 
 | 项目 | 代码入口 | 验证结果 |
 | --- | --- | --- |
 | 主站 | [main：79b4d0b](https://github.com/zxc9802/wb-dianshangjiqiren/commit/79b4d0b0d09cf26677794a09d50f9dc165ec0fd7) | 28 项相关测试及生产构建通过，含隔离 PostgreSQL 联调 |
 | 起芽知识库 | [master：d31dd51](https://github.com/zxc9802/qyzsk/commit/d31dd51ddf133561335490f1ec3127fa0e32a9e6) | 103 项通过，1 项原有可选数据库测试跳过；生产构建和修改文件 lint 通过 |
-| 买家秀 | [PR #2 → main](https://github.com/zxc9802/maijiaxiu/pull/2) | 28 项测试、生产构建、类型及 lint 通过 |
-| 店铺图 | [PR #2 → master](https://github.com/zxc9802/dianputu/pull/2) | 7 项新增上报测试及 Python 编译检查通过 |
-| 文案 | [PR #2 → main](https://github.com/zxc9802/wenan/pull/2) | 51 项测试、ESLint 及生产构建通过 |
-| 视频工作台 | [PR #3 → main](https://github.com/zxc9802/seedance/pull/3) | 107 项测试、生产构建及 Node 语法检查通过 |
-| 产品设计 | [PR #2 → main](https://github.com/zxc9802/chanpinsheji/pull/2) | 9 项新增测试及生产构建通过，修改文件 lint 无错误 |
-| SABC | [PR #3 → master](https://github.com/zxc9802/sabc/pull/3) | 完整测试 208 项通过；最后修复后相关回归 13 项、队列测试 7 项及构建通过 |
-| 销售助手 | [PR #5 → main](https://github.com/zxc9802/xiaoshou/pull/5) | 完整测试 119 项通过；新增集成与队列测试 8 项、前端及 API 构建通过 |
-| 爆款改写 | [PR #3 → main](https://github.com/zxc9802/baokuangaixie/pull/3) | 8 项新增测试、4 项 SSO 测试、生产构建及 lint 通过 |
+| 买家秀 | [master](https://github.com/zxc9802/maijiaxiu/tree/master) | 28 项测试、生产构建、类型及 lint 通过；保留 base64 上传和可空商品信息 |
+| 店铺图 | [main](https://github.com/zxc9802/dianputu/tree/main) | 8 项上报测试、Python 编译检查、前端测试及生产构建通过；覆盖 3 个新增风格后台入口的员工身份 |
+| 文案 | [wb](https://github.com/zxc9802/wenan/tree/wb) | 52 项测试、ESLint 及生产构建通过；补报 CLI 在模拟 Docker 运行目录内实际投递通过 |
+| 视频工作台 | [master](https://github.com/zxc9802/seedance/tree/master) | 123 项通过，5 项可选 PostgreSQL 集成跳过；其中上报 20 项通过，生产构建及语法检查通过 |
+| 产品设计 | [wb](https://github.com/zxc9802/chanpinsheji/tree/wb) | 42 项测试及生产构建通过；修改文件 lint 无错误，配置域名的 SSO 回跳已验证 |
+| SABC | [wb](https://github.com/zxc9802/sabc/tree/wb) | 208 项测试、7 项队列测试及生产构建通过；修改文件 lint 无错误 |
+| 销售助手 | [wb](https://github.com/zxc9802/xiaoshou/tree/wb) | 119 项全量测试、8 项上报测试、前端及 API 构建通过；会话过期跳配置主站的流程已验证 |
+| 爆款改写 | [wb](https://github.com/zxc9802/baokuangaixie/tree/wb) | 8 项上报测试、4 项 SSO/业务计费测试、生产构建及修改文件 lint 通过 |
 
-已知基线问题：店铺图完整测试中的 14 项失败与未修改基线一致；产品设计完整 lint 和独立 TypeScript 检查存在原有 React、设计类型及 Cloudflare 类型问题。主站此前完整测试有 2 项原有文本断言失败，本轮只重跑上述相关测试和生产构建。以上结果不包含付费上游实测或生产环境验收。
+已知基线问题：店铺图 `main` 原始基线 166 项测试中有 14 项失败，迁移后 174 项中的失败项完全相同；产品设计完整 lint 仍有 3 个既有错误，对应文件与 `wb` 基线相同。主站此前完整测试有 2 项原有文本断言失败；本轮只迁移工具分支，主站和知识库沿用此前已完成的功能验证结果。Seedance 的积分与数据库模块与目标 `master` 一致，未配置测试数据库时 5 项可选集成测试跳过。文案已验证 Docker 运行阶段复制的脚本依赖，但本机无 Docker，未执行实际镜像构建。以上结果不包含付费上游实测或生产环境验收。
