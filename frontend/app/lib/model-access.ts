@@ -45,6 +45,7 @@ const KB_CHAT_MODELS: readonly ModelAccessModelDefinition[] = [
     { modelKey: 'yunwu-gemini-3-flash-preview', label: 'Gemini 快速' },
     { modelKey: 'yunwu-gpt-5.4', label: 'GPT-5.5' },
     { modelKey: 'yunwu-gpt-5.6', label: 'GPT-5.6' },
+    { modelKey: 'yunwu-gpt-6', label: 'GPT-6' },
 ];
 
 export const MODEL_ACCESS_SITES: readonly ModelAccessSiteDefinition[] = [

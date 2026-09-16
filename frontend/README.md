@@ -20,6 +20,17 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## GPT-6 模型配置
+
+聊天模型列表中的 `GPT-6` 调用 OpenLux 的 `gpt-6-astra`，与 GPT-5.6 共用服务端配置：
+
+```dotenv
+OPENLUX_API_BASE_URL=https://api.openlux.ai
+OPENLUX_API_KEY=填写现有GPT-5.6使用的Key
+```
+
+如果 GPT-5.6 已配置可用，无需新增环境变量，也无需修改默认模型变量。部署新版后，管理员可直接使用 GPT-6；普通员工需在主站后台对应入口的模型权限中勾选 `GPT-6`。知识库的 GPT-6 权限也在主站后台配置，需同时部署知识库新版。
+
 ## Main Site SSO Entrances
 
 This frontend now exposes two main-site protected child-app launch flows:
