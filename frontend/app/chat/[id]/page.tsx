@@ -55,6 +55,7 @@ import {
     type ChatStreamProjection,
 } from '../../lib/chat-stream-events';
 import styles from './chat.module.css';
+import ChatShareControls from '../../components/ChatShareControls';
 import {
     MessageSquare, BarChart3, Trash2, Sparkles, FileText,
     ClipboardList, Paperclip, Mic, Loader2, Send, ArrowLeft,
@@ -205,6 +206,9 @@ interface MessageListProps {
     selectedMsgIds: Set<string>;
     onMessageContentClick: (event: ReactMouseEvent<HTMLDivElement>) => void;
     onTogglePinMessage: (id: string) => void;
+    shareSelection: Set<string> | null;
+    isPreparingShare: boolean;
+    onToggleShareMessage: (id: string) => void;
 }
 
 interface LoadingMessageProps {
@@ -340,6 +344,9 @@ const MemoizedMessageList = memo(function MessageList({
     selectedMsgIds,
     onMessageContentClick,
     onTogglePinMessage,
+    shareSelection,
+    isPreparingShare,
+    onToggleShareMessage,
 }: MessageListProps) {
     return (
         <>
@@ -359,6 +366,11 @@ const MemoizedMessageList = memo(function MessageList({
                         key={message.id}
                         className={`${styles.message} ${message.role === 'user' ? styles.userMsg : styles.assistantMsg} ${wfState && selectedMsgIds.has(message.id) ? styles.msgPinned : ''}`}
                     >
+                        {shareSelection !== null && message.id !== 'welcome' && (
+                            <label className={styles.shareCheckbox}>
+                                <input type="checkbox" disabled={isPreparingShare} checked={shareSelection.has(message.id)} onChange={() => onToggleShareMessage(message.id)} aria-label={`选择${message.role === 'user' ? '用户消息' : '智能体回复'}：${message.textContent.slice(0, 30)}`} />
+                            </label>
+                        )}
                         <div className={styles.msgBubble}>
                             {message.kind === 'image' && message.imageUrls?.length ? (
                                 <div className={styles.imageMessage}>
@@ -1097,6 +1109,22 @@ function ChatPageContent() {
     const isVideoBreakdownBot = botId === VIDEO_BREAKDOWN_BOT_ID;
 
     const [messages, setMessages] = useState<MessageItem[]>([{ id: 'welcome', role: 'assistant', content: fallbackWelcome, timestamp: Date.now() }]);
+    const [shareSelection, setShareSelection] = useState<Set<string> | null>(null);
+    const [isPreparingShare, setIsPreparingShare] = useState(false);
+    const shareRequestRef = useRef(0);
+    useEffect(() => {
+        shareRequestRef.current += 1;
+        setShareSelection(null);
+        setIsPreparingShare(false);
+    }, [conversationId, botId]);
+    const toggleShareMessage = useCallback((id: string) => {
+        setShareSelection(current => {
+            if (!current) return current;
+            const next = new Set(current);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    }, []);
     const [inputText, setInputText] = useState('');
     const [imageModeEnabled, setImageModeEnabled] = useState(false);
     const [responseModel, setResponseModel] = useState<ResponseModel>(DEFAULT_RESPONSE_MODEL);
@@ -1809,7 +1837,7 @@ function ChatPageContent() {
     };
 
     const sendMessage = useCallback(async (rawText: string, options?: { allowTextFallback?: boolean }) => {
-        if (!hasResponseModelAccess) return;
+        if (!hasResponseModelAccess || shareSelection !== null) return;
         const isImageRequest = imageModeEnabled;
         const hasFiles = !isImageRequest && attachedFiles.length > 0;
         const hasManualHistoryVideos = !isImageRequest
@@ -2315,6 +2343,7 @@ function ChatPageContent() {
         router,
         scheduleStreamingTextFlush,
         selectedConversationVideoIds,
+        shareSelection,
         webSearchMode,
         wfState,
         workflowFlag,
@@ -2685,6 +2714,29 @@ function ChatPageContent() {
                     </button>
                 </div>
                 <div className={styles.headerRight}>
+                    <ChatShareControls
+                        key={conversationId || 'new'}
+                        conversationId={conversationId}
+                        messageIds={messages.filter(message => message.id !== 'welcome').map(message => message.id)}
+                        selection={shareSelection}
+                        disabled={isStreaming || isLoadingConversation}
+                        onStart={async () => {
+                            if (!conversationId) return;
+                            const requestId = ++shareRequestRef.current;
+                            setShareSelection(new Set());
+                            setIsPreparingShare(true);
+                            try {
+                                const conversation = await fetchConversation(conversationId);
+                                if (shareRequestRef.current === requestId) setMessages(toMessages(conversation, fallbackWelcome));
+                            } catch (error) {
+                                if (shareRequestRef.current === requestId) setShareSelection(null);
+                                throw error;
+                            } finally {
+                                if (shareRequestRef.current === requestId) setIsPreparingShare(false);
+                            }
+                        }}
+                        onSelectionChange={setShareSelection}
+                    />
                     {isAdmin && (
                         <button onClick={() => setAdminPanelOpen(true)} className={styles.historyBtn} title="管理员设置">
                             <Settings size={14} />
@@ -2752,7 +2804,7 @@ function ChatPageContent() {
                 </div>
             )}
 
-            <div ref={messagesContainerRef} className={styles.messagesContainer}>
+            <div ref={messagesContainerRef} className={`${styles.messagesContainer} ${shareSelection !== null ? styles.sharingMessages : ''}`}>
                 <div className={styles.messages}>
                     <MemoizedMessageList
                         renderedMessages={renderedMessages}
@@ -2760,6 +2812,9 @@ function ChatPageContent() {
                         selectedMsgIds={selectedMsgIds}
                         onMessageContentClick={handleMessageContentClick}
                         onTogglePinMessage={togglePinMsg}
+                        shareSelection={shareSelection}
+                        isPreparingShare={isPreparingShare}
+                        onToggleShareMessage={toggleShareMessage}
                     />
                     <LoadingMessage show={showLoadingBubble} />
                     <StreamingMessage
@@ -2773,7 +2828,7 @@ function ChatPageContent() {
                 </div>
             </div>
 
-            {suggestions.length > 0 && !isStreaming && !imageModeEnabled && (
+            {suggestions.length > 0 && !isStreaming && !imageModeEnabled && shareSelection === null && (
                 <div className={styles.suggestions}>
                     {suggestions.map((suggestion, index) => (
                         <button
@@ -2834,7 +2889,7 @@ function ChatPageContent() {
             )}
 
             <div
-                className={`${styles.inputBar} ${isAttachmentDragActive ? styles.inputBarDragActive : ''}`}
+                className={`${styles.inputBar} ${isAttachmentDragActive ? styles.inputBarDragActive : ''} ${shareSelection !== null ? styles.sharingInput : ''}`}
                 onDragOver={handleAttachmentDragOver}
                 onDragLeave={handleAttachmentDragLeave}
                 onDrop={handleAttachmentDrop}

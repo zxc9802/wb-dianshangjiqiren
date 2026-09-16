@@ -29,7 +29,7 @@ for (const route of ['api/chat/route.ts', 'api/conversations/[id]/messages/route
             if (name === '__esModule') return true
             return () => { throw new Error(`Unexpected downstream call: ${specifier}.${String(name)}`) }
           } })
-          if (specifier.endsWith('/usage-context')) stubs[specifier] = { withUsage: fn => fn }
+          if (specifier.endsWith('/usage-context')) stubs[specifier] = { withUsage: fn => fn, setUsageBot: () => {} }
           if (specifier === 'zod') stubs[specifier] = { z }
           if (specifier.endsWith('/auth')) stubs[specifier] = {
             getAuthUser: async () => ({ id: 'member', role: 'user' }),

@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
         const [groups, rows, counts, users, rates, sources] = await Promise.all([
             prisma.$queryRaw(Prisma.sql`SELECT e.user_id AS "userId", u.nickname, u.email, u.group_name AS "groupName",
                 e.source, e.data->>'model' AS model, e.data->>'provider' AS provider,
+                e.data->>'botId' AS "botId", e.data->>'botName' AS "botName",
                 e.data->>'currency' AS currency, e.data->>'costBasis' AS "costBasis", e.data->>'tokenBasis' AS "tokenBasis",
                 COUNT(*)::int AS calls,
                 COUNT(*) FILTER (WHERE e.data->>'status' = 'pending')::int AS pending,
@@ -33,6 +34,7 @@ export async function GET(req: NextRequest) {
                 SUM((e.data->>'amount')::numeric)::float8 AS amount
                 FROM ai_usage_events e LEFT JOIN users u ON u.id = e.user_id WHERE ${filters}
                 GROUP BY e.user_id, u.nickname, u.email, u.group_name, e.source, e.data->>'model', e.data->>'provider',
+                    e.data->>'botId', e.data->>'botName',
                     e.data->>'currency', e.data->>'costBasis', e.data->>'tokenBasis'
                 ORDER BY "totalTokens" DESC NULLS LAST, e.user_id`),
             prisma.$queryRaw(Prisma.sql`SELECT e.id, e.created_at AS "createdAt", e.data, u.nickname, u.email

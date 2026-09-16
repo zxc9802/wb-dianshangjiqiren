@@ -1,4 +1,4 @@
-import { withUsage } from '@/app/lib/usage-context';
+import { setUsageBot, withUsage } from '@/app/lib/usage-context';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '../../../../lib/prisma';
@@ -584,6 +584,7 @@ async function handlePost(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const bot = getConversationBotPayload(conversation);
         await assertConversationBotAccess(userId, bot);
+        setUsageBot(bot.routeId, bot.name);
         const {
             content,
             displayContent,

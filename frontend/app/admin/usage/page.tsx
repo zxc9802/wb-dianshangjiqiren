@@ -6,10 +6,12 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../stores/auth';
 import type { UsageEvent } from '../../lib/usage-ledger';
 import type { UsageRate } from '../../lib/usage-values';
+import { usageChannelLabel, usageSourceLabel } from '../../lib/usage-labels';
 import styles from './usage.module.css';
 
 type Group = {
     userId: string; nickname: string; email: string; groupName: string; source: string; model: string; provider: string;
+    botId: string | null; botName: string | null;
     calls: number; pending: number; failed: number; inputTokens: number | null; outputTokens: number | null;
     cachedInputTokens: number | null; totalTokens: number | null; amount: number | null;
     currency: string | null; costBasis: string | null; tokenBasis: string;
@@ -22,8 +24,6 @@ type Data = {
 const number = (value: number | null | undefined) => value == null ? '—' : value.toLocaleString('zh-CN', { maximumFractionDigits: 0 });
 const money = (value: number | null | undefined, currency?: string | null) => value == null ? '待核算' : `${currency ?? ''} ${value.toFixed(8).replace(/0+$/, '').replace(/\.$/, '')}`;
 const basis = (value?: string | null) => value === 'actual' ? '实际扣费' : value === 'estimated' ? '估算' : '待核算';
-const toolNames: Record<string, string> = { chanpinsheji: '产品设计', sabc: 'SABC', xiaoshou: '销售助手', baokuangaixie: '爆款改写' };
-const sourceLabel = (source: string) => source === 'main' ? '主站' : `SSO · ${toolNames[source.replace(/^sso:/, '')] || source.replace(/^sso:/, '')}`;
 const statuses: Record<string, string> = { pending: '待完成 / 待核对', completed: '已完成', failed: '失败', interrupted: '中断' };
 const dateInput = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
@@ -89,7 +89,7 @@ export default function UsagePage() {
             <label>开始日期<input type="date" value={start} onChange={e => { setStart(e.target.value); setPage(1); }} /></label>
             <label>结束日期<input type="date" value={end} onChange={e => { setEnd(e.target.value); setPage(1); }} /></label>
             <label>员工<select value={employee} onChange={e => { setEmployee(e.target.value); setPage(1); }}><option value="">全部员工</option>{data?.users.map(u => <option key={u.id} value={u.id}>{u.nickname || u.email}</option>)}</select></label>
-            <label>来源<select value={source} onChange={e => { setSource(e.target.value); setPage(1); }}><option value="">全部来源</option>{data?.sources.map(s => <option key={s.source} value={s.source}>{sourceLabel(s.source)}</option>)}</select></label>
+            <label>来源<select value={source} onChange={e => { setSource(e.target.value); setPage(1); }}><option value="">全部来源</option>{data?.sources.map(s => <option key={s.source} value={s.source}>{usageChannelLabel(s.source)}</option>)}</select></label>
             <label>模型（完整名称）<input value={model} onChange={e => { setModel(e.target.value); setPage(1); }} placeholder="全部模型" /></label>
         </section>
         {error && <p role="alert" className={styles.error}>{error}</p>}{saved && <p role="status">{saved}</p>}
@@ -100,12 +100,12 @@ export default function UsagePage() {
                 <article><span>金额消耗</span>{amounts.size ? Array.from(amounts).map(([key, value]) => <div key={key}><strong>{money(value)}</strong><small>{key}</small></div>) : <strong>待核算</strong>}<small>{number(groups.filter(g => g.amount === null).reduce((n, g) => n + g.calls, 0))} 次金额待核算</small></article>
             </section>
             <h2>按员工、来源和模型汇总</h2>
-            <div className={styles.table}><table><thead><tr>{['员工 / 组别', '来源 / 模型', '调用 / 异常 / 待完成', '输入 Token', '输出 Token', '缓存命中', '总 Token', '金额'].map(s => <th key={s}>{s}</th>)}</tr></thead><tbody>
-                {groups.map((g, i) => <tr key={i}><td>{g.nickname || g.email || g.userId}<small>{g.groupName || '未分组'}</small></td><td>{sourceLabel(g.source)}<small>{g.model}</small><small>供应商：{g.provider}</small></td><td>{g.calls} / {g.failed} / {g.pending}</td><td>{number(g.inputTokens)}</td><td>{number(g.outputTokens)}</td><td>{number(g.cachedInputTokens)}</td><td>{number(g.totalTokens)}<small>{g.tokenBasis === 'estimated' ? '估算 Token' : g.tokenBasis === 'missing' ? '未返回' : '接口报告'}</small></td><td>{money(g.amount, g.currency)}<small>{basis(g.costBasis)}</small></td></tr>)}
-                {!groups.length && <tr><td colSpan={8}>所选范围暂无用量记录。</td></tr>}
+            <div className={styles.table}><table><thead><tr>{['员工 / 组别', '来源', '模型', '调用 / 异常 / 待完成', '输入 Token', '输出 Token', '缓存命中', '总 Token', '金额'].map(s => <th key={s}>{s}</th>)}</tr></thead><tbody>
+                {groups.map((g, i) => <tr key={i}><td>{g.nickname || g.email || g.userId}<small>{g.groupName || '未分组'}</small></td><td>{usageSourceLabel(g)}{g.botName && <small>{usageChannelLabel(g.source)}</small>}</td><td title={`供应商：${g.provider}`}>{g.model}</td><td>{g.calls} / {g.failed} / {g.pending}</td><td>{number(g.inputTokens)}</td><td>{number(g.outputTokens)}</td><td>{number(g.cachedInputTokens)}</td><td>{number(g.totalTokens)}<small>{g.tokenBasis === 'estimated' ? '估算 Token' : g.tokenBasis === 'missing' ? '未返回' : '接口报告'}</small></td><td>{money(g.amount, g.currency)}<small>{basis(g.costBasis)}</small></td></tr>)}
+                {!groups.length && <tr><td colSpan={9}>所选范围暂无用量记录。</td></tr>}
             </tbody></table></div>
-            <h2>调用明细</h2><div className={styles.table}><table><thead><tr>{['时间', '员工', '来源 / 模型', '状态', 'Token', '金额', '请求编号'].map(s => <th key={s}>{s}</th>)}</tr></thead><tbody>
-                {data.rows.map(row => <tr key={row.id}><td>{new Date(row.createdAt).toLocaleString('zh-CN')}</td><td>{row.nickname || row.email || row.data.userId}</td><td>{sourceLabel(row.data.source)}<small>{row.data.model}</small></td><td>{statuses[row.data.status]}</td><td>{number(row.data.totalTokens)}<small>{row.data.tokenBasis === 'estimated' ? '估算' : row.data.tokenBasis === 'reported' ? '接口报告' : '未返回'}</small></td><td>{money(row.data.amount, row.data.currency)}<small>{basis(row.data.costBasis)}</small></td><td><small>{row.data.requestId}</small>{row.data.upstreamRequestId && <small>上游：{row.data.upstreamRequestId}</small>}</td></tr>)}
+            <h2>调用明细</h2><div className={styles.table}><table><thead><tr>{['时间', '员工', '来源', '模型', '状态', 'Token', '金额', '请求编号'].map(s => <th key={s}>{s}</th>)}</tr></thead><tbody>
+                {data.rows.map(row => <tr key={row.id}><td>{new Date(row.createdAt).toLocaleString('zh-CN')}</td><td>{row.nickname || row.email || row.data.userId}</td><td>{usageSourceLabel(row.data)}{row.data.botName && <small>{usageChannelLabel(row.data.source)}</small>}</td><td title={`供应商：${row.data.provider}`}>{row.data.model}</td><td>{statuses[row.data.status]}</td><td>{number(row.data.totalTokens)}<small>{row.data.tokenBasis === 'estimated' ? '估算' : row.data.tokenBasis === 'reported' ? '接口报告' : '未返回'}</small></td><td>{money(row.data.amount, row.data.currency)}<small>{basis(row.data.costBasis)}</small></td><td><small>{row.data.requestId}</small>{row.data.upstreamRequestId && <small>上游：{row.data.upstreamRequestId}</small>}</td></tr>)}
             </tbody></table></div>
             <div className={styles.pager}><button disabled={page === 1 || busy} onClick={() => setPage(page - 1)}>上一页</button><span>{page} / {Math.max(1, Math.ceil(data.total / 50))}</span><button disabled={page * 50 >= data.total || busy} onClick={() => setPage(page + 1)}>下一页</button></div>
             <section><h2>模型估算费率</h2><p>按实际供应商和令牌分组填写。每百万 Token 单价；图片按次计价可填写“每次”。这里的费率不会改变员工积分余额，也不等于供应商账单。</p>

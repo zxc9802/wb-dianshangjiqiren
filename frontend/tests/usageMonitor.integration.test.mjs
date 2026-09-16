@@ -39,8 +39,11 @@ test('PostgreSQL: idempotent SSO ingestion, admin authorization, dates and curre
     });
     const send = (body, supplied = secret) => sso.POST(new Request('https://main.test/api/sso/usage', { method: 'POST', headers: { 'x-usage-tool': 'test', 'x-usage-secret': supplied }, body: JSON.stringify(body) }));
     const read = (authorization = 'admin-test', extra = '') => {
-        const req = new Request(`https://main.test/api/admin/usage?userId=${userId}${extra}`, { headers: { authorization } });
-        req.nextUrl = new URL(req.url);
+        const endpoint = new URL(`https://main.test/api/admin/usage?userId=${userId}${extra}`);
+        // Inserts can finish in the same millisecond as the exclusive default end.
+        if (!endpoint.searchParams.has('end')) endpoint.searchParams.set('end', new Date(Date.now() + 60_000).toISOString());
+        const req = new Request(endpoint, { headers: { authorization } });
+        req.nextUrl = endpoint;
         return admin.GET(req);
     };
     try {
@@ -77,6 +80,26 @@ test('PostgreSQL: idempotent SSO ingestion, admin authorization, dates and curre
         assert.equal(priced[0].data.amount, .0006);
         assert.equal(priced[0].data.costBasis, 'estimated');
         assert.deepEqual(priced[0].data.rate, rate);
+        const bots = [
+            { botId: 'bot-a', botName: '同名顾问' },
+            { botId: 'bot-b', botName: '同名顾问' },
+            { botId: 'bot-a', botName: '已更名顾问' },
+        ];
+        for (const [index, bot] of bots.entries()) {
+            assert.equal((await send({ ...event, ...bot, requestId: `${prefix}-bot-${index}` })).status, 200);
+        }
+        const attributed = await read().then(r => r.json());
+        const botGroups = attributed.groups.filter(g => g.botId);
+        assert.equal(botGroups.length, 3, 'same model and same name must not merge different bot identities or name snapshots');
+        for (const bot of bots) {
+            const group = botGroups.find(g => g.botId === bot.botId && g.botName === bot.botName);
+            assert.ok(group);
+            assert.equal(group.model, event.model);
+            assert.equal(group.calls, 1);
+            assert.equal(group.totalTokens, 150);
+            assert.equal(group.amount, .002);
+        }
+        assert.equal(attributed.rows.filter(row => row.data.botId).length, 3);
     } finally {
         await db.$executeRaw`DELETE FROM ai_usage_events WHERE user_id = ${userId}`;
         await db.user.deleteMany({ where: { id: userId } });

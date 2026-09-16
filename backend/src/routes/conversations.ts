@@ -1,4 +1,5 @@
 import { usageFetch } from '../services/usage-fetch';
+import { setUsageBot } from '../services/usage-context';
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../utils/prisma';
@@ -85,6 +86,7 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
 
     if (!conversation) throw new AppError('Conversation not found', 404);
     if (!conversation.bot) throw new AppError('Bot not found', 404);
+    setUsageBot(String(conversation.bot.sortOrder), conversation.bot.name);
 
     await prisma.message.create({
         data: { conversationId, role: 'user', content, inputType },

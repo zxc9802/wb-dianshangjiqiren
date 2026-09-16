@@ -11,6 +11,7 @@
 - 估算公式：`[(输入-缓存命中-缓存写入)×输入单价 + 缓存命中×缓存单价 + 缓存写入×写入单价 + 输出×输出单价] / 1,000,000`。有 `perCall` 则使用按次单价。当前配置为每供应商域名、模型一组固定费率；阶梯或多个令牌分组的费用需以供应商账单为准。
 - 费率随完成记录保存快照，修改只影响后续结算的估算；历史账目不重算。
 - 每个上游请求（包含重试）各记一次。流式取消/网络失败保留状态。进程异常退出留下 `pending`，显示“待完成 / 待核对”，不冒充零消耗或成功。
+- 汇总表与调用明细将“来源”“模型”分列。聊天请求从服务端已验证的智能体取得 `botId`、`botName`，来源显示调用时的智能体名称，模型显示实际请求的上游模型。汇总同时按智能体 ID 和名称快照分组，避免同一模型下的不同智能体合并。历史没有记录智能体的行显示“未记录智能体”，不猜测或回填。
 
 ## 本仓库自动采集范围
 
@@ -64,6 +65,8 @@ x-usage-secret: <该工具的服务端密钥>
 
 可以附带 `amount`、`currency`（USD/CNY）、`costBasis`（actual/estimated）及 `upstreamRequestId`。不传金额时主站按已配置费率估算。图片按次计价且无 Token 时，各 Token 字段应为 `null`、`tokenBasis` 为 `missing`。
 
+还可附带工具服务端确认的 `botId`、`botName`（各为 1–200 字符，前后空白会去除），用于区分子站内的智能体。旧版上报仍兼容，但没有名称的记录会标为“未记录智能体”。来源标识仍由鉴权工具决定，固定为 `sso:<工具名>`，不能由请求正文覆盖；`kb-chat` 与 `qyzsk` 显示为“起芽知识库机器人”。
+
 工具必须从已验证的 SSO 会话取得 userId，不接受浏览器随意指定员工。使用数据库 outbox 保存待上报事件，收到 `success:true` 后确认，网络/5xx 失败保留并重试；使用同一个 requestId。首次终态记录不可被重放覆盖。同一工具不同真实上游重试必须使用不同 requestId。上报不发送提示词、回复正文或 API Key。统计日期为主站接收时间，延迟补报不会倒填历史日期。
 
 ## 验证
@@ -71,6 +74,7 @@ x-usage-secret: <该工具的服务端密钥>
 ```sh
 cd frontend
 node --test tests/usageMonitor.test.mjs
+node --test tests/usageAttribution.test.mjs
 # 使用隔离的本机 usage_test 数据库，先应用 frontend Prisma schema：
 USAGE_TEST_DATABASE_URL=postgresql://...@127.0.0.1:15483/usage_test node --test tests/usageMonitor.integration.test.mjs
 npm run build

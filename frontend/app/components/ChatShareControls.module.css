@@ -1,0 +1,12 @@
+.trigger, .bar button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--color-border, #e2e8f0); border-radius: 8px; background: var(--color-card, #fff); color: var(--color-foreground, #0f172a); cursor: pointer; font-size: 13px; }
+.trigger:disabled, .bar button:disabled { opacity: .5; cursor: not-allowed; }
+.bar { position: fixed; z-index: 80; bottom: 24px; left: 50%; transform: translateX(-50%); width: min(480px, calc(100vw - 32px)); padding: 20px; box-sizing: border-box; border: 1px solid var(--color-border, #e2e8f0); border-radius: 16px; background: var(--color-card, #fff); color: var(--color-foreground, #0f172a); box-shadow: 0 8px 40px #0f172a26; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.bar p { font-size: 13px; color: var(--color-muted-foreground, #64748b); margin: 10px 0 14px; }
+.bar .error { color: #c2410c; }
+.bar input { width: 100%; padding: 10px; margin: 0 0 12px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 6px; color: inherit; background: transparent; }
+.bar .primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+.bar a { color: #2563eb; font-size: 14px; }
+.bar span[role='status'] { display: block; margin-top: 10px; font-size: 13px; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
