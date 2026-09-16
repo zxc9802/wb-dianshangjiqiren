@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../utils/prisma';
 import { estimateUsageCost, type TokenUsage, type UsageRate } from './usage-values';
+import { findUsageRate, mergeUsageRates } from './usage-pricing';
 
 export type UsageEvent = TokenUsage & {
     userId: string; source: string; requestId: string; provider: string; model: string;
@@ -11,6 +12,7 @@ export type UsageEvent = TokenUsage & {
     costBasis?: 'actual' | 'estimated' | 'missing';
     upstreamRequestId?: string | null;
     rate?: UsageRate | null;
+    historicalEstimate?: boolean;
 };
 
 let setup: Promise<unknown> | undefined;
@@ -30,12 +32,12 @@ export async function ensureUsageLedger() {
 
 export async function getUsageRates(): Promise<UsageRate[]> {
     const row = await prisma.systemSetting.findUnique({ where: { key: 'ai_usage_rates' } });
-    return row ? JSON.parse(row.value) : [];
+    return mergeUsageRates(row ? JSON.parse(row.value) : []);
 }
 
 export async function priceUsage(event: UsageEvent): Promise<UsageEvent> {
     if (event.amount !== undefined && event.amount !== null && event.currency && event.costBasis) return event;
-    const rate = (await getUsageRates()).find(item => item.provider === event.provider && item.model === event.model);
+    const rate = findUsageRate(event, await getUsageRates());
     const amount = rate && event.status === 'completed' ? estimateUsageCost(event, rate) : null;
     return { ...event, amount, currency: amount !== null ? rate!.currency : null, costBasis: amount !== null ? 'estimated' : 'missing', rate: rate ?? null };
 }

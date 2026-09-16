@@ -107,7 +107,7 @@ test('Responses failure inside HTTP 200 is not recorded as a successful generati
 
 test('independently deployed backend uses the same metering implementation', async () => {
     const { readFile } = await import('node:fs/promises');
-    for (const file of ['usage-values.ts', 'usage-fetch.ts', 'usage-ledger.ts']) {
+    for (const file of ['usage-values.ts', 'usage-fetch.ts', 'usage-ledger.ts', 'usage-pricing.ts', 'usage-rate-catalog.ts']) {
         const frontend = await readFile(path.join(root, file), 'utf8');
         const backend = await readFile(path.join(root, '../../../backend/src/services', file), 'utf8');
         assert.equal(backend.replace("from '../utils/prisma'", "from './prisma'"), frontend);

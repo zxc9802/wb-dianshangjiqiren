@@ -75,6 +75,8 @@ test('admin SQL returns and groups bot identity separately from the model', asyn
     const { GET } = await loadTsModule(path.join(app, 'api/admin/usage/route.ts'), {
         '@prisma/client': { Prisma }, zod: { z }, '@/app/lib/auth': auth,
         '@/app/lib/prisma': { prisma }, '@/app/lib/usage-ledger': { ensureUsageLedger: async () => {}, getUsageRates: async () => [] },
+        '@/app/lib/usage-pricing': { normalizeUsageProvider: value => value },
+        '@/app/lib/usage-report-pricing': await loadTsModule(path.join(app, 'lib/usage-report-pricing.ts'), { '@prisma/client': { Prisma } }),
     });
     const response = await GET({ nextUrl: new URL('https://main.test/api/admin/usage'), headers: new Headers() });
     assert.equal(response.status, 200);

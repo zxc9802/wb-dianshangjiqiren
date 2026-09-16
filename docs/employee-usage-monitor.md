@@ -7,9 +7,12 @@
 - 输入 Token 包含缓存读取和缓存写入；输出 Token 包含推理 Token，不重复相加。支持 OpenAI Chat Completions、Responses、Gemini、Anthropic JSON 与 SSE。
 - 上游没有返回用量时存 `null`，前端显示“未返回”。不能用字符串长度冒充实际 Token。
 - 金额分为供应商实际扣费、估算、待核算。USD 和 CNY 分开统计，不自动换算，不修改员工钱包或积分。
-- 主站目前按管理员费率估算；只有工具服务端拿到供应商明确账单时，才能上报 `costBasis: actual`。OpenLux 广场的分组、缓存、阶梯价格不等于每个 API Key 的实际扣费，故没有默认写入最低报价。
+- 内置用户在 2026-09-16 提供的 5 张 OpenLux 截图中完整显示的 56 个模型价格（46 个 Token 计费、10 个按次计费）。仅匹配供应商 `api.openlux.ai` 或 `openlux`，不把截图价格套到 `yunwu.ai` 或其它上游。同名模型的管理员自定义费率优先，其他已有自定义配置保留。
+- 截图美元单价不额外乘分组或阶梯倍率，界面统一标为估算；只有工具服务端拿到供应商明确账单时，才能上报 `costBasis: actual`。这不是供应商账单，也不会扣员工积分。
 - 估算公式：`[(输入-缓存命中-缓存写入)×输入单价 + 缓存命中×缓存单价 + 缓存写入×写入单价 + 输出×输出单价] / 1,000,000`。有 `perCall` 则使用按次单价。当前配置为每供应商域名、模型一组固定费率；阶梯或多个令牌分组的费用需以供应商账单为准。
-- 费率随完成记录保存快照，修改只影响后续结算的估算；历史账目不重算。
+- 费率随新完成记录保存快照；已有实际扣费、已有估算金额及币种保持不变。历史已完成且金额为空的记录，在管理员查询时按当前费率补算并标为“按当前费率补算”，不改写原始账目。没有历史用量的调用无法还原。
+- 缺失单价为 `null`，有对应消耗时显示待核算，不当作免费。`gpt-image-2` 和 `gpt-image-2.5-sunburst` 有不同的图片输入价，需要 `imageInputTokens`（上游 `input_tokens_details.image_tokens`）；没有输入分项时不猜测混合输入的价格。按次模型没有 Token 也可按一次成功调用估算，失败/中断/待完成状态不套用按次价。
+- 面板展示累计金额、员工/来源/模型汇总，以及每次调用的“计费依据”；费率编辑器可覆盖默认单价或恢复截图价。输入总量包含缓存和图片，普通输入计费时扣除这些分项，避免重复计价。
 - 每个上游请求（包含重试）各记一次。流式取消/网络失败保留状态。进程异常退出留下 `pending`，显示“待完成 / 待核对”，不冒充零消耗或成功。
 - 汇总表与调用明细将“来源”“模型”分列。聊天请求从服务端已验证的智能体取得 `botId`、`botName`，来源显示调用时的智能体名称，模型显示实际请求的上游模型。汇总同时按智能体 ID 和名称快照分组，避免同一模型下的不同智能体合并。历史没有记录智能体的行显示“未记录智能体”，不猜测或回填。
 
@@ -67,6 +70,14 @@ x-usage-secret: <该工具的服务端密钥>
 
 还可附带工具服务端确认的 `botId`、`botName`（各为 1–200 字符，前后空白会去除），用于区分子站内的智能体。旧版上报仍兼容，但没有名称的记录会标为“未记录智能体”。来源标识仍由鉴权工具决定，固定为 `sso:<工具名>`，不能由请求正文覆盖；`kb-chat` 与 `qyzsk` 显示为“起芽知识库机器人”。
 
+如上游提供图片输入分项，可附带非负整数 `imageInputTokens`，不得超过输入总量。供应商字段应填写实际请求的 hostname；不要把云雾调用标为 OpenLux。
+
+### 起芽知识库 OpenLux 接入
+
+知识库新版的 OpenLux 调用默认上报到主站 `/api/sso/usage`，旧的 `/api/internal/usage-events` 配置会自动切换路径。主站 `SSO_USAGE_SECRETS` 需加入 `"kb-chat":"至少32字符的共享密钥"` 并保留已有工具键；值必须等于知识库服务端的 `USAGE_MONITOR_INTERNAL_SECRET`。知识库还需配置已有的 `MAIN_APP_URL`。此密钥用于用量上报，和 `OPENLUX_API_KEY` 无关。
+
+其它 SSO 工具已经通过 `/api/sso/usage` 或主站工具结算接口上报的 OpenLux 用量同样使用默认价格。尚未接入上报的工具不会仅因 SSO 登录而自动产生用量记录。
+
 工具必须从已验证的 SSO 会话取得 userId，不接受浏览器随意指定员工。使用数据库 outbox 保存待上报事件，收到 `success:true` 后确认，网络/5xx 失败保留并重试；使用同一个 requestId。首次终态记录不可被重放覆盖。同一工具不同真实上游重试必须使用不同 requestId。上报不发送提示词、回复正文或 API Key。统计日期为主站接收时间，延迟补报不会倒填历史日期。
 
 ## 验证
@@ -75,6 +86,7 @@ x-usage-secret: <该工具的服务端密钥>
 cd frontend
 node --test tests/usageMonitor.test.mjs
 node --test tests/usageAttribution.test.mjs
+node --test tests/usagePricing.test.mjs tests/usageRateCatalog.test.mjs
 # 使用隔离的本机 usage_test 数据库，先应用 frontend Prisma schema：
 USAGE_TEST_DATABASE_URL=postgresql://...@127.0.0.1:15483/usage_test node --test tests/usageMonitor.integration.test.mjs
 npm run build
