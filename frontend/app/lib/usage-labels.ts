@@ -1,6 +1,7 @@
 const toolNames: Record<string, string> = {
     chanpinsheji: '产品设计', sabc: 'SABC', xiaoshou: '销售助手', baokuangaixie: '爆款改写',
     'kb-chat': '起芽知识库机器人', qyzsk: '起芽知识库机器人',
+    maijiaxiu: '买家秀', dianputu: '店铺图', wenan: '文案', seedance: '视频工作台',
 };
 
 export function usageChannelLabel(source: string): string {

@@ -32,3 +32,12 @@ test('malformed usage is rejected and fixed media is accepted without fake token
  assert.equal(schema.safeParse({...input,action:'settle',mediaProduct:'nanobanana2',billableUnits:1}).success,true);
  assert.equal(schema.safeParse({...input,action:'settle',usage:{inputTokens:1,outputTokens:2,totalTokens:3}}).success,true);
 });
+test('separate usage reporting is preserved and cannot change during billing lifecycle',()=>{
+ const request=schema.parse({...input,usageReportedSeparately:true});
+ assert.equal(request.usageReportedSeparately,true);
+ const reserved=transition(undefined,request);
+ assert.equal(transition(reserved,{...request,action:'settle'}).status,'completed');
+ assert.throws(()=>transition(reserved,{...input,action:'settle'}));
+ assert.throws(()=>transition(transition(undefined,input),{...request,action:'release'}));
+ assert.equal(transition(transition(undefined,input),{...input,action:'release',usageReportedSeparately:false}).status,'failed');
+});

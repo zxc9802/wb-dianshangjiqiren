@@ -10,7 +10,7 @@ const schema = z.object({
     userId: z.string().min(1).max(100), requestId: z.string().min(1).max(200),
     provider: z.string().min(1).max(100), model: z.string().min(1).max(200),
     botId: z.string().trim().min(1).max(200).optional(), botName: z.string().trim().min(1).max(200).optional(),
-    status: z.enum(['completed', 'failed', 'interrupted']),
+    status: z.enum(['pending', 'completed', 'failed', 'interrupted']),
     inputTokens: tokens, outputTokens: tokens, totalTokens: tokens,
     cachedInputTokens: tokens.default(null), cacheWriteTokens: tokens.default(null), reasoningTokens: tokens.default(null),
     imageInputTokens: tokens.optional(),

@@ -11,6 +11,7 @@ export const toolRequestSchema = z.object({
     product: z.string().min(1).max(50), userId: z.string().min(1).max(191),
     requestId: z.string().uuid(), operation: z.string().regex(/^[a-z0-9][a-z0-9._-]{0,79}$/),
     model: z.string().max(191).optional(), providerId: z.string().max(100).optional(),
+    usageReportedSeparately: z.boolean().optional(),
     estimatedInputTokens: count.optional(), maxOutputTokens: count.optional(),
     mediaProduct: z.enum(['nanobanana2', 'seedance2', 'seedance2-fast']).optional(),
     billableUnits: z.number().positive().max(10000).optional(),
@@ -34,6 +35,9 @@ export function transitionRequest(previous: Stored | undefined, input: ToolReque
     }
     for (const key of ['userId', 'product', 'operation', 'model', 'providerId', 'mediaProduct', 'billableUnits'] as const) {
         if (previous.input[key] !== input[key]) throw new AppError('Request identity or model mismatch.', 409);
+    }
+    if (Boolean(previous.input.usageReportedSeparately) !== Boolean(input.usageReportedSeparately)) {
+        throw new AppError('Usage reporting mode mismatch.', 409);
     }
     if (previous.status !== 'pending') {
         // Late failure callbacks must not undo a successful settlement.
@@ -59,7 +63,7 @@ async function ensureTables() {
 /** wb employees are not charged points. Track the authenticated request lifecycle and supplier usage. */
 export async function recordToolRequest(input: ToolRequest) {
     await ensureTables();
-    const event = input.action === 'reserve' ? null : await priceUsage({
+    const event = input.action === 'reserve' || input.usageReportedSeparately ? null : await priceUsage({
         ...emptyUsage(), ...(input.usage || {}), userId: input.userId, source: input.product,
         requestId: input.requestId, provider: input.providerId || 'unknown', model: input.model || 'unknown',
         status: input.action === 'settle' ? 'completed' : 'failed',

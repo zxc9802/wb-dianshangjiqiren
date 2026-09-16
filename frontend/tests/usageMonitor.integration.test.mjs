@@ -41,6 +41,10 @@ test('PostgreSQL: idempotent SSO ingestion, admin authorization, dates and curre
         'node:crypto': crypto, zod: { z }, '@/app/lib/auth': auth, '@/app/lib/prisma': { prisma: db }, '@/app/lib/usage-ledger': ledger,
         '@/app/lib/server-env': { readServerEnv: () => JSON.stringify({ test: secret }) },
     });
+    const billing = await loadTsModule(path.join(app, 'lib/sso-tool-requests.ts'), {
+        'node:crypto': crypto, zod: { z }, './auth': auth, './prisma': { prisma: db },
+        './usage-ledger': ledger, './usage-values': values,
+    });
     const send = (body, supplied = secret) => sso.POST(new Request('https://main.test/api/sso/usage', { method: 'POST', headers: { 'x-usage-tool': 'test', 'x-usage-secret': supplied }, body: JSON.stringify(body) }));
     const read = (authorization = 'admin-test', extra = '') => {
         const endpoint = new URL(`https://main.test/api/admin/usage?userId=${userId}${extra}`);
@@ -76,6 +80,30 @@ test('PostgreSQL: idempotent SSO ingestion, admin authorization, dates and curre
         await ledger.recordUsage({ ...event, source: 'main', requestId: `${prefix}-pending`, amount: 888 });
         const completed = await db.$queryRaw`SELECT data FROM ai_usage_events WHERE request_id = ${`${prefix}-pending`}`;
         assert.equal(completed[0].data.amount, .002);
+        const video = { ...event, requestId: `${prefix}-video`, provider: 'api.openlux.ai', model: 'veo_3_1',
+            ...values.emptyUsage(), tokenBasis: 'missing', amount: undefined, currency: undefined, costBasis: undefined };
+        assert.equal((await send({ ...video, status: 'pending' })).status, 200);
+        const pendingVideo = await db.$queryRaw`SELECT data FROM ai_usage_events WHERE request_id = ${video.requestId}`;
+        assert.equal(pendingVideo[0].data.amount ?? null, null);
+        assert.equal((await send(video).then(r => r.json())).accepted, true);
+        assert.equal((await send({ ...video, status: 'pending' }).then(r => r.json())).accepted, false);
+        assert.equal((await send({ ...video, status: 'failed' }).then(r => r.json())).accepted, false);
+        const finishedVideo = await db.$queryRaw`SELECT data FROM ai_usage_events WHERE request_id = ${video.requestId}`;
+        assert.equal(finishedVideo[0].data.status, 'completed');
+        assert.equal(finishedVideo[0].data.amount, .0565);
+        for (const separate of [true, false]) {
+            const request = { action: 'reserve', product: 'sabc', userId, requestId: crypto.randomUUID(),
+                operation: 'analysis', model: 'gpt-6-astra', providerId: 'api.openlux.ai', usageReportedSeparately: separate };
+            await billing.recordToolRequest(request);
+            const settled = await billing.recordToolRequest({ ...request, action: 'settle', usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 } });
+            assert.equal(settled.status, 'completed');
+            assert.equal(settled.chargeRequired, false);
+            await billing.recordToolRequest({ ...request, action: 'release' });
+            const events = await db.$queryRaw`SELECT data FROM ai_usage_events WHERE request_id = ${request.requestId}`;
+            assert.equal(events.length, separate ? 0 : 1, 'canonical reporting must suppress only legacy usage rows');
+            const requests = await db.$queryRaw`SELECT data FROM sso_tool_requests WHERE request_id = ${request.requestId}`;
+            assert.equal(requests[0].data.status, 'completed', 'billing lifecycle is retained');
+        }
         const rate = { provider: 'provider.test', model: 'model', currency: 'USD', inputPerMillion: 2, outputPerMillion: 8, cachedPerMillion: .2, cacheWritePerMillion: 2 };
         const saved = await admin.PUT(new Request('https://main.test/api/admin/usage', { method: 'PUT', headers: { authorization: 'admin-test' }, body: JSON.stringify([rate]) }));
         assert.equal(saved.status, 200);
@@ -152,6 +180,7 @@ test('PostgreSQL: idempotent SSO ingestion, admin authorization, dates and curre
         assert.equal(imageUnknown.rows.find(row => row.data.requestId === `${prefix}-history-8`).data.amount, null);
         assert.equal((await ledger.priceUsage({ ...cases[8].data, requestId: 'unit' })).amount, null);
     } finally {
+        await db.$executeRaw`DELETE FROM sso_tool_requests WHERE data->'input'->>'userId' = ${userId}`;
         await db.$executeRaw`DELETE FROM ai_usage_events WHERE user_id = ${userId}`;
         await db.user.deleteMany({ where: { id: userId } });
         if (previousRate) await db.systemSetting.update({ where: { key: 'ai_usage_rates' }, data: { value: previousRate.value } });
