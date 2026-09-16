@@ -3,6 +3,7 @@ export const RESPONSE_MODEL_VALUES = [
     'gemini-deep-thinking',
     'gpt-5.4',
     'gpt-5.6-luna',
+    'gpt-6',
     'claude-opus-4.6',
 ] as const;
 
@@ -12,12 +13,14 @@ export const RESPONSE_MODEL_OPTIONS = [
     { value: 'gemini', label: 'Gemini' },
     { value: 'gpt-5.4', label: 'GPT-5.5' },
     { value: 'gpt-5.6-luna', label: 'GPT-5.6' },
+    { value: 'gpt-6', label: 'GPT-6' },
     { value: 'claude-opus-4.6', label: 'Claude Opus 4.6' },
 ] as const satisfies ReadonlyArray<{ value: ResponseModel; label: string }>;
 
 const OPENAI_UPSTREAM_MODEL_BY_RESPONSE_MODEL = {
     'gpt-5.4': 'gpt-5.5',
     'gpt-5.6-luna': 'gpt-5.6-luna',
+    'gpt-6': 'gpt-6-astra',
 } as const;
 
 export type OpenAIResponseModel = keyof typeof OPENAI_UPSTREAM_MODEL_BY_RESPONSE_MODEL;

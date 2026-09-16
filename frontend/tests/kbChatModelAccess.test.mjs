@@ -44,5 +44,12 @@ test('knowledge-base SSO preserves selected models and gives admins every model'
     sites: [{ siteKey: 'kb-chat', mode: 'selected', modelKeys: ['yunwu-gpt-5.4'] }],
   })
   const admin = await exchange('admin', [])
-  assert.equal(admin.sites[0].modelKeys.length, 4)
+  assert.equal(admin.sites[0].modelKeys.length, 5)
+  assert.ok(admin.sites[0].modelKeys.includes('yunwu-gpt-6'))
+})
+
+test('knowledge-base SSO forwards an explicit GPT-6 grant', async () => {
+  assert.deepEqual(await exchange('member', [{ permissions: [{ modelKey: 'yunwu-gpt-6' }] }]), {
+    sites: [{ siteKey: 'kb-chat', mode: 'selected', modelKeys: ['yunwu-gpt-6'] }],
+  })
 })

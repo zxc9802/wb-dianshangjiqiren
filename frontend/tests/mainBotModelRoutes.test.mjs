@@ -14,8 +14,9 @@ const access = await loadTsModule(path.join(appRoot, 'lib/model-access.ts'), {
   './chat-models': models,
 })
 
-for (const route of ['api/chat/route.ts', 'api/conversations/[id]/messages/route.ts']) {
-  test(`${route} rejects unauthorized models for ordinary and custom bots before generation`, async () => {
+for (const [route, responseModel] of ['api/chat/route.ts', 'api/conversations/[id]/messages/route.ts']
+  .flatMap(route => ['gpt-5.6-luna', 'gpt-6'].map(responseModel => [route, responseModel]))) {
+  test(`${route} rejects unauthorized ${responseModel} for ordinary and custom bots before generation`, async () => {
     const sourcePath = path.join(appRoot, route)
     const source = ts.createSourceFile(sourcePath, await readFile(sourcePath, 'utf8'), ts.ScriptTarget.Latest)
     for (const botId of ['1', '34', 'custom-example']) {
@@ -61,12 +62,12 @@ for (const route of ['api/chat/route.ts', 'api/conversations/[id]/messages/route
         const { POST } = await loadTsModule(sourcePath, stubs)
         const req = new Request('http://localhost/api/chat', {
           method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ botId, content: 'test', message: 'test', responseModel: 'gpt-5.6-luna' }),
+          body: JSON.stringify({ botId, content: 'test', message: 'test', responseModel }),
         })
         const response = await POST(req, { params: Promise.resolve({ id: 'conversation' }) })
         assert.equal(response.status, 403)
         assert.equal((await response.json()).code, 'MODEL_ACCESS_DENIED')
-        assert.deepEqual(checked, [{ userId: 'member', siteKey: 'main-general', modelKey: 'gpt-5.6-luna' }])
+        assert.deepEqual(checked, [{ userId: 'member', siteKey: 'main-general', modelKey: responseModel }])
       }
     }
   })
