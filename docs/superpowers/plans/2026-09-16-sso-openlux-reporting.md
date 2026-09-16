@@ -19,4 +19,4 @@
 
 Detailed protocol and ownership are coordinated in `tmp/sso-price-audit/reporting-contract.md` outside production code. No production database or paid model endpoint is used for testing.
 
-Publication: main-site main and knowledge master are pushed. All eight other tool PRs are merged into their default branches: dianputu and sabc into master, and the other six into main. Remote branch trees match the tested commits. The deployment guide contains all PR links, test results and required environment variables. Live deployment is not part of this verification.
+Publication: main-site main and knowledge master are pushed; eight other tools have draft PRs pending the user's branch choice. The deployment guide contains all PR links, test results and required environment variables. Live deployment is not part of this verification.
